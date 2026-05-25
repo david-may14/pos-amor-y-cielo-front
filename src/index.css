@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background-color: #faf7f2;
+    color: #1a2410;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-forest text-cream font-medium px-4 py-2 rounded-lg hover:bg-forest-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-surface-muted text-forest font-medium px-4 py-2 rounded-lg hover:bg-cream-dark transition-colors;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-red-700 transition-colors;
+  }
+  .input {
+    @apply w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest bg-white;
+  }
+  .label {
+    @apply block text-sm font-medium text-stone-600 mb-1;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-stone-100;
+  }
+}
+
+/* Scrollbar delgado */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c9bfb0; border-radius: 3px; }
