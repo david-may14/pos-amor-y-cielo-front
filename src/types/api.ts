@@ -261,6 +261,7 @@ export interface VentaResponse {
   items: ItemResponse[]
   descuentoTicketNombre?: string | null
   descuentoTicketMonto?: number | null
+  splitGrupo?: string | null
 }
 export interface ResumenDia {
   fecha: string

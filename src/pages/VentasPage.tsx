@@ -134,12 +134,20 @@ export default function VentasPage() {
                 <tbody className="divide-y divide-stone-50">
                   {ventas.map((v) => {
                     const anulada = v.estado === 'ANULADA'
+                    const splitCount = v.splitGrupo
+                      ? ventas.filter(x => x.splitGrupo === v.splitGrupo).length
+                      : 0
                     return (
-                      <tr key={v.id} className={`transition-colors ${anulada ? 'bg-red-50/50 opacity-60' : 'hover:bg-surface-muted/50'}`}>
+                      <tr key={v.id} className={`transition-colors ${anulada ? 'bg-red-50/50 opacity-60' : v.splitGrupo ? 'hover:bg-amber-50/30' : 'hover:bg-surface-muted/50'}`}>
                         <td className="px-5 py-3 font-medium text-stone-700">
                           #{v.id}
                           {anulada && (
                             <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">anulada</span>
+                          )}
+                          {v.splitGrupo && (
+                            <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                              split {splitCount > 1 ? `×${splitCount}` : ''}
+                            </span>
                           )}
                         </td>
                         <td className="px-5 py-3 text-stone-500">
@@ -200,6 +208,16 @@ export default function VentasPage() {
                 )}
               </div>
             </div>
+            {detalle.splitGrupo && (() => {
+              const hermanas = ventas.filter(x => x.splitGrupo === detalle.splitGrupo)
+              const idx = hermanas.findIndex(x => x.id === detalle.id) + 1
+              return (
+                <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                  <span className="font-medium">Cuenta dividida {idx} de {hermanas.length}</span>
+                  <span className="text-amber-400 font-mono">#{detalle.splitGrupo.slice(0, 8)}</span>
+                </div>
+              )
+            })()}
 
             {/* Ítems */}
             <div className="space-y-3 border-t border-stone-100 pt-3">
