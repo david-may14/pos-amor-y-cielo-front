@@ -8,6 +8,7 @@ import type {
 } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
+import SplitCuentaModal from '../components/SplitCuentaModal'
 
 interface CartMod {
   opcionId: number
@@ -75,6 +76,8 @@ export default function POSPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [ventaExitosa, setVentaExitosa] = useState<VentaResponse | null>(null)
+  const [showSplit, setShowSplit] = useState(false)
+  const [splitResults, setSplitResults] = useState<VentaResponse[] | null>(null)
   const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
 
   const [loadingMods, setLoadingMods] = useState<Set<number>>(new Set())
@@ -651,14 +654,27 @@ export default function POSPage() {
             <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
           )}
 
-          <button
-            onClick={handleCobrar}
-            disabled={cart.length === 0 || submitting}
-            className="btn-primary w-full py-3 text-base flex items-center justify-center gap-2"
-          >
-            {submitting && <Spinner className="w-4 h-4 text-cream" />}
-            {submitting ? 'Procesando…' : `Cobrar ${cart.length > 0 ? fmt(totalConPropina) : ''}`}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowSplit(true); setError('') }}
+              disabled={cart.length === 0 || submitting}
+              className="flex-shrink-0 py-3 px-3 rounded-xl border-2 border-stone-200 text-stone-500 hover:border-forest hover:text-forest disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Dividir cuenta"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18" />
+              </svg>
+            </button>
+            <button
+              onClick={handleCobrar}
+              disabled={cart.length === 0 || submitting}
+              className="btn-primary flex-1 py-3 text-base flex items-center justify-center gap-2"
+            >
+              {submitting && <Spinner className="w-4 h-4 text-cream" />}
+              {submitting ? 'Procesando…' : `Cobrar ${cart.length > 0 ? fmt(totalConPropina) : ''}`}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -775,6 +791,67 @@ export default function POSPage() {
                 {modModal.cantidad > 1 ? `Agregar ${modModal.cantidad} al pedido` : 'Agregar al pedido'}
               </button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Split de cuenta ── */}
+      {showSplit && (
+        <SplitCuentaModal
+          cart={cart}
+          onConfirm={(results) => {
+            setSplitResults(results)
+            setShowSplit(false)
+            clearCart()
+          }}
+          onClose={() => setShowSplit(false)}
+        />
+      )}
+
+      {/* ── Recibo dividido ── */}
+      {splitResults && (
+        <Modal title="Cuentas cobradas" onClose={() => setSplitResults(null)} size="sm">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-green-50 rounded-xl p-4">
+              <span className="text-2xl">✓</span>
+              <div>
+                <p className="font-semibold text-green-800">
+                  {splitResults.length} cuenta{splitResults.length !== 1 ? 's' : ''} procesada{splitResults.length !== 1 ? 's' : ''}
+                </p>
+                <p className="text-sm text-green-600">
+                  Total cobrado: {fmt(splitResults.reduce((s, v) => s + v.total + (v.propina ?? 0), 0))}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {splitResults.map((v, idx) => (
+                <div key={v.id} className="card px-4 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-stone-800">
+                      Cuenta {idx + 1} · #{v.id}
+                    </p>
+                    <span className="text-xs bg-surface-muted text-stone-600 px-2 py-0.5 rounded-md">
+                      {v.metodoPago}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {v.items.map((item, i) => (
+                      <div key={i} className="flex justify-between text-xs text-stone-600">
+                        <span>{item.cantidad}× {item.nombreProducto}</span>
+                        <span>{fmt(item.precioUnitario * item.cantidad)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold text-forest mt-2 pt-2 border-t border-stone-50">
+                    <span>Total</span>
+                    <span>{fmt(v.total + (v.propina ?? 0))}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setSplitResults(null)} className="btn-primary w-full py-2.5">
+              Nueva venta
+            </button>
           </div>
         </Modal>
       )}
