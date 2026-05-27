@@ -12,8 +12,8 @@ const hoy = () => new Date().toISOString().split('T')[0]
 
 type DisplayItem =
   | { kind: 'solo'; venta: VentaResponse }
-  | { kind: 'group-header'; grupo: string; miembros: VentaResponse[] }
-  | { kind: 'sub'; venta: VentaResponse; idx: number; count: number }
+  | { kind: 'group-header'; grupo: string; miembros: VentaResponse[]; refId: number }
+  | { kind: 'sub'; venta: VentaResponse; idx: number; count: number; refId: number }
 
 export default function VentasPage() {
   const { isAdmin } = useAuth()
@@ -58,8 +58,9 @@ export default function VentasPage() {
       } else if (!seen.has(v.splitGrupo)) {
         seen.add(v.splitGrupo)
         const miembros = byGrupo.get(v.splitGrupo)!
-        items.push({ kind: 'group-header', grupo: v.splitGrupo, miembros })
-        miembros.forEach((m, i) => items.push({ kind: 'sub', venta: m, idx: i + 1, count: miembros.length }))
+        const refId = Math.min(...miembros.map(m => m.id))
+        items.push({ kind: 'group-header', grupo: v.splitGrupo, miembros, refId })
+        miembros.forEach((m, i) => items.push({ kind: 'sub', venta: m, idx: i + 1, count: miembros.length, refId }))
       }
     })
     return items
@@ -169,8 +170,8 @@ export default function VentasPage() {
                         <tr key={`gh-${row.grupo}`} className="bg-amber-50/70 border-b-0">
                           <td colSpan={6} className="px-5 py-2">
                             <div className="flex items-center gap-3 text-xs">
-                              <span className="font-semibold text-amber-700">Ticket dividido</span>
-                              <span className="bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-medium">{row.miembros.length} cuentas</span>
+                              <span className="font-semibold text-amber-700">Cuenta #{row.refId}</span>
+                              <span className="bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-medium">dividida en {row.miembros.length}</span>
                               <span className="text-stone-400">{hora}</span>
                               <span className="ml-auto font-semibold text-stone-600">{fmt(totalGrupo)} total</span>
                             </div>
@@ -181,14 +182,12 @@ export default function VentasPage() {
                     const v = row.venta
                     const anulada = v.estado === 'ANULADA'
                     const isSub = row.kind === 'sub'
+                    const displayId = isSub ? `${row.refId}-${row.idx}` : String(v.id)
                     return (
                       <tr key={v.id} className={`transition-colors ${anulada ? 'bg-red-50/50 opacity-60' : isSub ? 'bg-amber-50/20 hover:bg-amber-50/40' : 'hover:bg-surface-muted/50'}`}>
                         <td className="py-3 font-medium text-stone-700" style={{ paddingLeft: isSub ? '2rem' : '1.25rem', paddingRight: '1.25rem' }}>
                           {isSub && <span className="text-amber-300 mr-1 text-xs">└</span>}
-                          #{v.id}
-                          {isSub && (
-                            <span className="ml-1.5 text-xs text-amber-500 font-normal">{row.idx}/{row.count}</span>
-                          )}
+                          #{displayId}
                           {anulada && (
                             <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">anulada</span>
                           )}
@@ -253,11 +252,11 @@ export default function VentasPage() {
             </div>
             {detalle.splitGrupo && (() => {
               const hermanas = ventas.filter(x => x.splitGrupo === detalle.splitGrupo)
+              const refId = Math.min(...hermanas.map(x => x.id))
               const idx = hermanas.findIndex(x => x.id === detalle.id) + 1
               return (
                 <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-                  <span className="font-medium">Cuenta dividida {idx} de {hermanas.length}</span>
-                  <span className="text-amber-400 font-mono">#{detalle.splitGrupo.slice(0, 8)}</span>
+                  <span className="font-medium">Cuenta #{refId}-{idx} de {hermanas.length}</span>
                 </div>
               )
             })()}
