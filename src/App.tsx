@@ -14,6 +14,7 @@ import DescuentosPage from './pages/DescuentosPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import CajaPage from './pages/CajaPage'
 import ConfiguracionPage from './pages/ConfiguracionPage'
+import TicketsPage from './pages/TicketsPage'
 
 function RequireAuth() {
   const { user } = useAuth()
@@ -34,6 +35,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/pos" replace />} />
           <Route path="/pos" element={<POSPage />} />
+          <Route path="/tickets" element={<TicketsPage />} />
           <Route path="/ventas" element={<VentasPage />} />
           <Route path="/caja" element={<CajaPage />} />
 

@@ -273,3 +273,54 @@ export interface ResumenDia {
   utilidad: number
   ventasPorMetodoPago: Record<string, number>
 }
+
+// ─── Tickets abiertos (comandas) ──────────────────────────────────────────────
+export interface TicketModificadorRequest {
+  opcionId: number
+  nombre: string
+  precioExtra: number
+}
+export interface TicketItemRequest {
+  productoId: number
+  nombreProducto: string
+  cantidad: number
+  precioUnitario: number
+  notas?: string | null
+  modificadores?: TicketModificadorRequest[]
+  descuentoId?: number | null
+}
+export interface CrearTicketRequest {
+  nombre?: string | null
+  items: TicketItemRequest[]
+}
+export interface TicketModificadorResponse {
+  opcionId: number
+  nombre: string
+  precioExtra: number
+}
+export interface TicketItemResponse {
+  id: number
+  productoId: number
+  nombreProducto: string
+  cantidad: number
+  precioUnitario: number
+  notas: string | null
+  descuentoId: number | null
+  modificadores: TicketModificadorResponse[]
+}
+export interface TicketResponse {
+  id: number
+  nombre: string | null
+  estado: 'ABIERTO' | 'COBRADO' | 'CANCELADO'
+  ventaId: number | null
+  creadoEn: string
+  actualizadoEn: string
+  cerradoEn: string | null
+  items: TicketItemResponse[]
+  totalEstimado: number
+}
+export interface CobrarTicketRequest {
+  metodoPago: string
+  descuentoTicketId?: number | null
+  propina?: number
+}

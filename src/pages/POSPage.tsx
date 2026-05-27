@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { listarProductos, listarModificadoresProducto } from '../api/productos'
 import { listarCategorias } from '../api/categorias'
 import { crearVenta } from '../api/ventas'
-import { getDescuentoAplicable, listarDescuentosTicket } from '../api/descuentos'
+import { getDescuentoAplicable, listarDescuentos, listarDescuentosTicket } from '../api/descuentos'
+import { detalleTicket, crearTicket, actualizarTicket, cobrarTicket } from '../api/tickets'
 import type {
   ProductoDTO, Categoria, VentaResponse, MetodoPago, ModificadorGrupo, DescuentoView,
+  TicketResponse, TicketItemRequest,
 } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 import SplitCuentaModal from '../components/SplitCuentaModal'
+import ElapsedSince from '../components/ElapsedSince'
 
 interface CartMod {
   opcionId: number
@@ -65,6 +69,8 @@ const fmtDescuento = (d: DescuentoView | CartDiscount) =>
   d.tipo === 'PORCENTAJE' ? `${d.valor}%` : fmt(d.valor)
 
 export default function POSPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [productos, setProductos] = useState<ProductoDTO[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
@@ -79,6 +85,12 @@ export default function POSPage() {
   const [showSplit, setShowSplit] = useState(false)
   const [splitResults, setSplitResults] = useState<VentaResponse[] | null>(null)
   const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
+
+  // Ticket activo (modo edición)
+  const [ticketActivo, setTicketActivo] = useState<TicketResponse | null>(null)
+  const [showGuardarTicket, setShowGuardarTicket] = useState(false)
+  const [nombreTicketInput, setNombreTicketInput] = useState('')
+  const [savingTicket, setSavingTicket] = useState(false)
 
   const [loadingMods, setLoadingMods] = useState<Set<number>>(new Set())
   const [modModal, setModModal] = useState<ModModal | null>(null)
@@ -111,6 +123,87 @@ export default function POSPage() {
   }, [])
 
   useEffect(() => { cargar() }, [cargar])
+
+  // Hidratar ticket desde el state de navegación
+  const hidratarTicket = useCallback(async (ticketId: number) => {
+    try {
+      const [t, descuentos] = await Promise.all([
+        detalleTicket(ticketId),
+        listarDescuentos().catch(() => [] as DescuentoView[]),
+      ])
+      const descById = new Map(descuentos.map(d => [d.id, d]))
+      const items: CartItem[] = t.items.map((ti, idx) => ({
+        lineId: `tk-${t.id}-${ti.id}-${idx}`,
+        productoId: ti.productoId,
+        nombre: ti.nombreProducto,
+        precioUnitario: ti.precioUnitario,
+        cantidad: ti.cantidad,
+        notas: ti.notas ?? '',
+        mods: ti.modificadores.map(m => ({ opcionId: m.opcionId, nombre: m.nombre, precioExtra: m.precioExtra })),
+        descuento: ti.descuentoId
+          ? (() => {
+              const d = descById.get(ti.descuentoId!)
+              return d ? { descuentoId: d.id, nombre: d.nombre, tipo: d.tipo, valor: d.valor } : null
+            })()
+          : null,
+      }))
+      setCart(items)
+      setTicketActivo(t)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo cargar el ticket')
+    }
+  }, [])
+
+  useEffect(() => {
+    const ticketId = (location.state as { ticketId?: number } | null)?.ticketId
+    if (ticketId) {
+      hidratarTicket(ticketId)
+      // limpiar el state para que un refresh no recargue
+      navigate(location.pathname, { replace: true })
+    }
+  }, [location, navigate, hidratarTicket])
+
+  const cartToTicketItems = (): TicketItemRequest[] => cart.map(i => ({
+    productoId: i.productoId,
+    nombreProducto: i.nombre,
+    cantidad: i.cantidad,
+    precioUnitario: i.precioUnitario,
+    notas: i.notas || null,
+    modificadores: i.mods.map(m => ({ opcionId: m.opcionId, nombre: m.nombre, precioExtra: m.precioExtra })),
+    descuentoId: i.descuento?.descuentoId ?? null,
+  }))
+
+  const abrirGuardarTicket = () => {
+    setNombreTicketInput(ticketActivo?.nombre ?? '')
+    setShowGuardarTicket(true)
+  }
+
+  const handleGuardarTicket = async () => {
+    if (cart.length === 0) return
+    setSavingTicket(true)
+    setError('')
+    try {
+      const payload = { nombre: nombreTicketInput.trim() || null, items: cartToTicketItems() }
+      if (ticketActivo) {
+        const t = await actualizarTicket(ticketActivo.id, payload)
+        setTicketActivo(t)
+      } else {
+        await crearTicket(payload)
+        clearCart()
+        setTicketActivo(null)
+      }
+      setShowGuardarTicket(false)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al guardar el ticket')
+    } finally {
+      setSavingTicket(false)
+    }
+  }
+
+  const salirEdicionTicket = () => {
+    setTicketActivo(null)
+    clearCart()
+  }
 
   const addLine = (producto: ProductoDTO, mods: CartMod[], descuento: CartDiscount | null, cantidad: number) => {
     const precioUnitario = producto.precioVenta + mods.reduce((s, m) => s + m.precioExtra, 0)
@@ -254,14 +347,29 @@ export default function POSPage() {
     setSubmitting(true)
     setError('')
     try {
-      const items = cart.map((i) => ({
-        productoId: i.productoId,
-        cantidad: i.cantidad,
-        ...(i.notas ? { notas: i.notas } : {}),
-        ...(i.mods.length > 0 ? { modificadorOpcionIds: i.mods.map((m) => m.opcionId) } : {}),
-        ...(i.descuento ? { descuentoId: i.descuento.descuentoId } : {}),
-      }))
-      const venta = await crearVenta(items, metodoPago, descuentoTicket?.id ?? null, propinaNum > 0 ? propinaNum : undefined)
+      let venta: VentaResponse
+      if (ticketActivo) {
+        // Sincronizar items por si fueron modificados, luego cobrar
+        await actualizarTicket(ticketActivo.id, {
+          nombre: ticketActivo.nombre,
+          items: cartToTicketItems(),
+        })
+        venta = await cobrarTicket(ticketActivo.id, {
+          metodoPago,
+          descuentoTicketId: descuentoTicket?.id ?? null,
+          propina: propinaNum > 0 ? propinaNum : 0,
+        })
+        setTicketActivo(null)
+      } else {
+        const items = cart.map((i) => ({
+          productoId: i.productoId,
+          cantidad: i.cantidad,
+          ...(i.notas ? { notas: i.notas } : {}),
+          ...(i.mods.length > 0 ? { modificadorOpcionIds: i.mods.map((m) => m.opcionId) } : {}),
+          ...(i.descuento ? { descuentoId: i.descuento.descuentoId } : {}),
+        }))
+        venta = await crearVenta(items, metodoPago, descuentoTicket?.id ?? null, propinaNum > 0 ? propinaNum : undefined)
+      }
       setVentaExitosa(venta)
       clearCart()
     } catch (e: unknown) {
@@ -382,13 +490,31 @@ export default function POSPage() {
       {/* ── Carrito ── */}
       <aside className="w-80 flex-shrink-0 bg-white border-l border-stone-100 flex flex-col">
         <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
-          <h2 className="font-semibold text-stone-800">Orden</h2>
-          {cart.length > 0 && (
+          <h2 className="font-semibold text-stone-800">{ticketActivo ? 'Ticket abierto' : 'Orden'}</h2>
+          {cart.length > 0 && !ticketActivo && (
             <button onClick={clearCart} className="text-xs text-stone-400 hover:text-red-500 transition-colors">
               Limpiar
             </button>
           )}
+          {ticketActivo && (
+            <button onClick={salirEdicionTicket} className="text-xs text-stone-400 hover:text-stone-700 transition-colors">
+              Salir
+            </button>
+          )}
         </div>
+
+        {ticketActivo && (
+          <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 flex items-center justify-between gap-2 text-xs">
+            <div className="min-w-0">
+              <p className="font-semibold text-amber-800 truncate">
+                #{ticketActivo.id}{ticketActivo.nombre ? ` · ${ticketActivo.nombre}` : ''}
+              </p>
+              <p className="text-amber-600">
+                Abierto <ElapsedSince iso={ticketActivo.creadoEn} />
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {cart.length === 0 ? (
@@ -657,13 +783,23 @@ export default function POSPage() {
           <div className="flex gap-2">
             <button
               onClick={() => { setShowSplit(true); setError('') }}
-              disabled={cart.length === 0 || submitting}
+              disabled={cart.length === 0 || submitting || !!ticketActivo}
               className="flex-shrink-0 py-3 px-3 rounded-xl border-2 border-stone-200 text-stone-500 hover:border-forest hover:text-forest disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title="Dividir cuenta"
+              title={ticketActivo ? 'No disponible en modo ticket' : 'Dividir cuenta'}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18" />
+              </svg>
+            </button>
+            <button
+              onClick={abrirGuardarTicket}
+              disabled={cart.length === 0 || submitting}
+              className="flex-shrink-0 py-3 px-3 rounded-xl border-2 border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title={ticketActivo ? 'Actualizar ticket' : 'Guardar como ticket'}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
               </svg>
             </button>
             <button
@@ -907,6 +1043,50 @@ export default function POSPage() {
             <button onClick={() => setVentaExitosa(null)} className="btn-primary w-full py-2.5">
               Nueva venta
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Guardar ticket ── */}
+      {showGuardarTicket && (
+        <Modal
+          title={ticketActivo ? 'Actualizar ticket' : 'Guardar ticket'}
+          onClose={() => setShowGuardarTicket(false)}
+          size="sm"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-stone-500 mb-1.5 block">
+                Etiqueta <span className="text-stone-300">(opcional — mesa, nombre)</span>
+              </label>
+              <input
+                type="text"
+                value={nombreTicketInput}
+                onChange={(e) => setNombreTicketInput(e.target.value)}
+                placeholder="Mesa 4, Andrés…"
+                autoFocus
+                className="input text-sm"
+                maxLength={120}
+                onKeyDown={(e) => e.key === 'Enter' && handleGuardarTicket()}
+              />
+            </div>
+            <div className="bg-surface-muted rounded-lg px-3 py-2.5 text-xs text-stone-500 flex justify-between">
+              <span>{cart.length} ítems · subtotal sin cobrar</span>
+              <span className="font-semibold text-stone-700">{fmt(subtotalConDesc)}</span>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setShowGuardarTicket(false)} className="btn-secondary flex-1">
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardarTicket}
+                disabled={savingTicket || cart.length === 0}
+                className="btn-primary flex-1 flex items-center justify-center gap-2"
+              >
+                {savingTicket && <Spinner className="w-4 h-4 text-cream" />}
+                {ticketActivo ? 'Actualizar' : 'Guardar'}
+              </button>
+            </div>
           </div>
         </Modal>
       )}
