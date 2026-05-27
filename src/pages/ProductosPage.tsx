@@ -6,10 +6,15 @@ import {
   eliminarProducto,
   obtenerReceta,
   reemplazarReceta,
+  listarModificadoresProducto,
+  asignarModificador,
+  quitarModificador,
+  toggleDisponibilidad,
 } from '../api/productos'
+import { listarModificadores } from '../api/modificadores'
 import { listarCategorias } from '../api/categorias'
 import { listarIngredientes } from '../api/ingredientes'
-import type { ProductoDTO, Categoria, RecetaLineaDTO, Ingrediente } from '../types/api'
+import type { ProductoDTO, Categoria, RecetaLineaDTO, Ingrediente, ModificadorGrupo } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 
@@ -40,7 +45,20 @@ export default function ProductosPage() {
   const [receta, setReceta] = useState<RecetaLineaDTO[]>([])
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([])
   const [recetaLoading, setRecetaLoading] = useState(false)
+  const [recetaError, setRecetaError] = useState('')
+  const [recetaSuccess, setRecetaSuccess] = useState(false)
   const [newRecetaLinea, setNewRecetaLinea] = useState({ ingredienteId: '', cantidad: '' })
+
+  const [busqueda, setBusqueda] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
+
+  const [togglingDisp, setTogglingDisp] = useState<number | null>(null)
+
+  const [modifProducto, setModifProducto] = useState<ProductoDTO | null>(null)
+  const [todosGrupos, setTodosGrupos] = useState<ModificadorGrupo[]>([])
+  const [gruposAsignados, setGruposAsignados] = useState<Set<number>>(new Set())
+  const [modifLoading, setModifLoading] = useState(false)
+  const [toggling, setToggling] = useState<number | null>(null)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -110,6 +128,8 @@ export default function ProductosPage() {
   const openReceta = async (p: ProductoDTO) => {
     setRecetaProducto(p)
     setRecetaLoading(true)
+    setRecetaError('')
+    setRecetaSuccess(false)
     setNewRecetaLinea({ ingredienteId: '', cantidad: '' })
     try {
       const [r, ings] = await Promise.all([obtenerReceta(p.id), listarIngredientes()])
@@ -122,15 +142,80 @@ export default function ProductosPage() {
 
   const handleGuardarReceta = async () => {
     if (!recetaProducto) return
+    // flush pending form line before saving
+    let lineasBase = receta
+    if (newRecetaLinea.ingredienteId && newRecetaLinea.cantidad) {
+      const ing = ingredientes.find((i) => i.id === parseInt(newRecetaLinea.ingredienteId))
+      if (ing) {
+        const linea: RecetaLineaDTO = {
+          id: 0, ingredienteId: ing.id, ingredienteNombre: ing.nombre,
+          unidad: ing.unidad, cantidad: parseFloat(newRecetaLinea.cantidad),
+        }
+        lineasBase = [...lineasBase.filter((l) => l.ingredienteId !== ing.id), linea]
+        setReceta(lineasBase)
+        setNewRecetaLinea({ ingredienteId: '', cantidad: '' })
+      }
+    }
     setSaving(true)
+    setRecetaError('')
+    setRecetaSuccess(false)
     try {
-      const lineas = receta.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad }))
+      const lineas = lineasBase.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad }))
       const updated = await reemplazarReceta(recetaProducto.id, lineas)
       setReceta(updated)
+      setRecetaSuccess(true)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error al guardar receta')
+      setRecetaError(e instanceof Error ? e.message : 'Error al guardar receta')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openModificadores = async (p: ProductoDTO) => {
+    setModifProducto(p)
+    setModifLoading(true)
+    try {
+      const [todos, asignados] = await Promise.all([
+        listarModificadores(),
+        listarModificadoresProducto(p.id),
+      ])
+      setTodosGrupos(todos)
+      setGruposAsignados(new Set(asignados.map((g) => g.id)))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al cargar modificadores')
+    } finally {
+      setModifLoading(false)
+    }
+  }
+
+  const handleToggleDisponibilidad = async (p: ProductoDTO) => {
+    if (togglingDisp === p.id) return
+    setTogglingDisp(p.id)
+    try {
+      const updated = await toggleDisponibilidad(p.id)
+      setProductos((prev) => prev.map((x) => x.id === p.id ? updated : x))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al actualizar disponibilidad')
+    } finally {
+      setTogglingDisp(null)
+    }
+  }
+
+  const handleToggleGrupo = async (grupoId: number, asignado: boolean) => {
+    if (!modifProducto || toggling === grupoId) return
+    setToggling(grupoId)
+    try {
+      if (asignado) {
+        await quitarModificador(modifProducto.id, grupoId)
+        setGruposAsignados((prev) => { const next = new Set(prev); next.delete(grupoId); return next })
+      } else {
+        await asignarModificador(modifProducto.id, grupoId)
+        setGruposAsignados((prev) => new Set([...prev, grupoId]))
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al actualizar')
+    } finally {
+      setToggling(null)
     }
   }
 
@@ -157,6 +242,10 @@ export default function ProductosPage() {
     )
   }
 
+  const productosFiltrados = productos
+    .filter((p) => categoriaFiltro === 'Todos' || p.categoria === categoriaFiltro)
+    .filter((p) => !busqueda.trim() || p.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
+
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="flex items-center justify-between mb-6">
@@ -170,6 +259,46 @@ export default function ProductosPage() {
         <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-5">{error}</div>
       )}
 
+      {/* Filtros */}
+      <div className="flex gap-3 mb-4 items-center">
+        {/* Búsqueda */}
+        <div className="relative flex-1 max-w-xs">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input
+            className="input pl-9 text-sm py-2"
+            placeholder="Buscar producto…"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+          {busqueda && (
+            <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Filtro por categoría */}
+        <div className="flex gap-1 flex-wrap">
+          {['Todos', ...categorias.map((c) => c.nombre)].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoriaFiltro(cat)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                categoriaFiltro === cat
+                  ? 'bg-forest text-cream border-forest'
+                  : 'bg-white text-stone-500 border-stone-200 hover:border-forest/50'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -181,15 +310,37 @@ export default function ProductosPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-50">
-            {productos.map((p) => (
-              <tr key={p.id} className="hover:bg-surface-muted/50">
-                <td className="px-5 py-3 font-medium text-stone-800">{p.nombre}</td>
+            {productosFiltrados.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-5 py-12 text-center text-stone-400">
+                  {busqueda ? `Sin resultados para "${busqueda}"` : 'Sin productos en esta categoría'}
+                </td>
+              </tr>
+            )}
+            {productosFiltrados.map((p) => (
+              <tr key={p.id} className={`hover:bg-surface-muted/50 ${!p.disponible ? 'opacity-50' : ''}`}>
+                <td className="px-5 py-3 font-medium text-stone-800">
+                  {p.nombre}
+                  {!p.disponible && (
+                    <span className="ml-2 text-xs bg-stone-100 text-stone-400 px-1.5 py-0.5 rounded">no disponible</span>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-stone-500">{p.categoria || '—'}</td>
                 <td className="px-5 py-3 text-right font-semibold text-forest">{fmt(p.precioVenta)}</td>
                 <td className="px-5 py-3 text-right">
                   <div className="flex items-center justify-end gap-3">
+                    <button
+                      onClick={() => handleToggleDisponibilidad(p)}
+                      disabled={togglingDisp === p.id}
+                      className={`text-xs transition-colors ${p.disponible ? 'text-stone-400 hover:text-amber-600' : 'text-amber-600 hover:text-forest'}`}
+                    >
+                      {togglingDisp === p.id ? '…' : p.disponible ? 'Deshabilitar' : 'Habilitar'}
+                    </button>
                     <button onClick={() => openReceta(p)} className="text-xs text-stone-400 hover:text-forest transition-colors">
                       Receta
+                    </button>
+                    <button onClick={() => openModificadores(p)} className="text-xs text-stone-400 hover:text-forest transition-colors">
+                      Modificadores
                     </button>
                     <button onClick={() => openEdit(p)} className="text-xs text-forest hover:underline">
                       Editar
@@ -201,13 +352,6 @@ export default function ProductosPage() {
                 </td>
               </tr>
             ))}
-            {productos.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-5 py-12 text-center text-stone-400">
-                  Sin productos registrados
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
@@ -265,6 +409,60 @@ export default function ProductosPage() {
         </Modal>
       )}
 
+      {/* Modificadores modal */}
+      {modifProducto && (
+        <Modal
+          title={`Modificadores — ${modifProducto.nombre}`}
+          onClose={() => setModifProducto(null)}
+          size="md"
+        >
+          {modifLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner className="w-6 h-6 text-forest" />
+            </div>
+          ) : todosGrupos.length === 0 ? (
+            <p className="text-sm text-stone-400 text-center py-8">
+              No hay grupos de modificadores. Créalos en la sección <strong>Modificadores</strong>.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {todosGrupos.map((g) => {
+                const asignado = gruposAsignados.has(g.id)
+                return (
+                  <div key={g.id} className="flex items-center justify-between bg-surface-muted rounded-xl px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-stone-800">{g.nombre}</p>
+                      <p className="text-xs text-stone-400">
+                        {(g.opciones ?? []).length} opciones
+                        {g.seleccionMin > 0 ? ` · mín. ${g.seleccionMin}` : ' · opcional'}
+                        {` · máx. ${g.seleccionMax}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleToggleGrupo(g.id, asignado)}
+                      disabled={toggling === g.id}
+                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                        asignado ? 'bg-forest' : 'bg-stone-200'
+                      }`}
+                    >
+                      {toggling === g.id ? (
+                        <Spinner className="absolute inset-0 m-auto w-3 h-3 text-white" />
+                      ) : (
+                        <span
+                          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
+                            asignado ? 'left-5' : 'left-0.5'
+                          }`}
+                        />
+                      )}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Modal>
+      )}
+
       {/* Receta modal */}
       {recetaProducto && (
         <Modal title={`Receta — ${recetaProducto.nombre}`} onClose={() => setRecetaProducto(null)} size="lg">
@@ -272,6 +470,12 @@ export default function ProductosPage() {
             <div className="flex justify-center py-8"><Spinner className="w-6 h-6 text-forest" /></div>
           ) : (
             <div className="space-y-4">
+              {recetaError && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{recetaError}</p>
+              )}
+              {recetaSuccess && (
+                <p className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">Receta guardada correctamente</p>
+              )}
               {/* Current recipe */}
               {receta.length > 0 ? (
                 <div className="space-y-2">

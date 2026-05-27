@@ -56,6 +56,7 @@ export interface ProductoDTO {
   nombre: string
   precioVenta: number
   categoria: string
+  disponible: boolean
 }
 export interface ProductoRequest {
   nombre: string
@@ -84,6 +85,7 @@ export interface Ingrediente {
   stockActual: number
   stockMinimo: number
   costoUnitario: number
+  rendimientoLote: number | null
   actualizadoEn: string
 }
 export interface IngredienteRequest {
@@ -91,6 +93,29 @@ export interface IngredienteRequest {
   unidad: string
   stockMinimo: number
   costoUnitario: number
+  stockInicial?: number
+}
+
+// ─── Sub-recetas ──────────────────────────────────────────────────────────────
+export interface SubrecetaLineaDTO {
+  id: number
+  baseId: number
+  baseNombre: string
+  baseUnidad: string
+  cantidad: number
+}
+export interface SubrecetaDTO {
+  rendimientoLote: number | null
+  unidad: string
+  lineas: SubrecetaLineaDTO[]
+}
+export interface SubrecetaLineaRequest {
+  baseId: number
+  cantidad: number
+}
+export interface SubrecetaRequest {
+  rendimientoLote: number
+  lineas: SubrecetaLineaRequest[]
 }
 
 // ─── Inventario ───────────────────────────────────────────────────────────────
@@ -115,11 +140,103 @@ export interface AjusteRequest {
   nota?: string
 }
 
+// ─── Modificadores ────────────────────────────────────────────────────────────
+export interface ModificadorOpcion {
+  id: number
+  nombre: string
+  precioExtra: number
+  activo: boolean
+  ingrediente: Ingrediente | null
+  cantidad: number | null
+}
+export interface ModificadorGrupo {
+  id: number
+  nombre: string
+  seleccionMin: number
+  seleccionMax: number | null
+  activo: boolean
+  creadoEn: string
+  opciones: ModificadorOpcion[]
+}
+export interface GrupoRequest {
+  nombre: string
+  seleccionMin?: number
+  seleccionMax?: number | null
+  opciones?: OpcionRequest[]
+}
+export interface OpcionRequest {
+  nombre: string
+  precioExtra: number
+  ingredienteId?: number | null
+  cantidad?: number | null
+}
+export interface ModificadorResponse {
+  nombre: string
+  precioExtra: number
+}
+
+// ─── Descuentos ───────────────────────────────────────────────────────────────
+export interface DescuentoView {
+  id: number
+  nombre: string
+  tipo: 'PORCENTAJE' | 'FIJO'
+  valor: number
+  aplicaEn: 'ITEM' | 'TICKET'
+  activo: boolean
+  fechaFin: string | null
+  creadoEn: string
+  categorias: { id: number; nombre: string }[]
+  productos: { id: number; nombre: string }[]
+}
+export interface DescuentoRequest {
+  nombre: string
+  tipo: 'PORCENTAJE' | 'FIJO'
+  valor: number
+  aplicaEn: 'ITEM' | 'TICKET'
+  activo: boolean
+  fechaFin?: string | null
+}
+
+// ─── Turnos ───────────────────────────────────────────────────────────────────
+export interface MovimientoCajaDTO {
+  id: number
+  tipo: 'ENTRADA' | 'SALIDA'
+  monto: number
+  motivo: string
+  creadoEn: string
+}
+
+export interface TurnoDTO {
+  id: number
+  usuarioNombre: string
+  fondoInicial: number
+  abiertoEn: string
+  cerradoEn: string | null
+  conteoEfectivo: number | null
+  ventasEfectivo: number | null
+  movimientosNeto: number | null
+  efectivoEsperado: number | null
+  diferencia: number | null
+  estado: string
+  notas: string | null
+  ventasTotalActual: number | null
+  ventasCountActual: number | null
+  movimientos: MovimientoCajaDTO[]
+}
+
+// ─── Configuración ────────────────────────────────────────────────────────────
+export interface ConfiguracionDTO {
+  ivaPorcentaje: number
+  comisionTarjeta: number
+}
+
 // ─── Ventas ───────────────────────────────────────────────────────────────────
 export interface ItemRequest {
   productoId: number
   cantidad: number
   notas?: string
+  modificadorOpcionIds?: number[]
+  descuentoId?: number | null
 }
 export interface ItemResponse {
   nombreProducto: string
@@ -127,20 +244,31 @@ export interface ItemResponse {
   precioUnitario: number
   costoUnitario: number
   notas: string | null
+  modificadores: ModificadorResponse[]
+  descuentoNombre?: string | null
+  descuentoMonto?: number | null
 }
 export interface VentaResponse {
   id: number
   total: number
   costoTotal: number
+  propina: number
+  ivaMonto: number
+  comisionMonto: number
+  estado: string
   metodoPago: string
   creadaEn: string
   items: ItemResponse[]
+  descuentoTicketNombre?: string | null
+  descuentoTicketMonto?: number | null
 }
 export interface ResumenDia {
   fecha: string
   totalVentas: number
   ingresos: number
   costos: number
+  totalIva: number
+  totalComisiones: number
   utilidad: number
   ventasPorMetodoPago: Record<string, number>
 }

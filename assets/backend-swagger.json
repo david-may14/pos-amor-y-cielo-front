@@ -1,1321 +1,1759 @@
 {
-    "openapi": "3.0.1",
-    "info": {
-        "title": "OpenAPI definition",
-        "version": "v0"
-    },
-    "servers": [
-        {
-            "url": "http://localhost:8080",
-            "description": "Generated server url"
-        }
-    ],
-    "paths": {
-        "/api/usuarios/{id}": {
-            "put": {
-                "tags": [
-                    "usuario-controller"
-                ],
-                "operationId": "actualizar",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ActualizarUsuarioRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/UsuarioDTO"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "tags": [
-                    "usuario-controller"
-                ],
-                "operationId": "desactivar",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                }
-            }
-        },
-        "/api/productos/{id}": {
-            "put": {
-                "tags": [
-                    "producto-controller"
-                ],
-                "operationId": "actualizar_1",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductoRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProductoDTO"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "tags": [
-                    "producto-controller"
-                ],
-                "operationId": "desactivar_1",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                }
-            }
-        },
-        "/api/productos/{id}/receta": {
-            "get": {
-                "tags": [
-                    "producto-controller"
-                ],
-                "operationId": "obtenerReceta",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/RecetaLineaDTO"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "tags": [
-                    "producto-controller"
-                ],
-                "operationId": "reemplazarReceta",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/components/schemas/RecetaLineaRequest"
-                                }
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/RecetaLineaDTO"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/ingredientes/{id}": {
-            "put": {
-                "tags": [
-                    "ingrediente-controller"
-                ],
-                "operationId": "actualizar_2",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/IngredienteRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Ingrediente"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/categorias/{id}": {
-            "put": {
-                "tags": [
-                    "categoria-controller"
-                ],
-                "operationId": "actualizar_3",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CategoriaRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Categoria"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "tags": [
-                    "categoria-controller"
-                ],
-                "operationId": "eliminar",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                }
-            }
-        },
-        "/api/ventas": {
-            "get": {
-                "tags": [
-                    "venta-controller"
-                ],
-                "operationId": "listar",
-                "parameters": [
-                    {
-                        "name": "fecha",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/VentaResponse"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "tags": [
-                    "venta-controller"
-                ],
-                "operationId": "crear",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CrearVentaRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/VentaResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/usuarios": {
-            "get": {
-                "tags": [
-                    "usuario-controller"
-                ],
-                "operationId": "listar_1",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/UsuarioDTO"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "tags": [
-                    "usuario-controller"
-                ],
-                "operationId": "crear_1",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CrearUsuarioRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/UsuarioDTO"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/productos": {
-            "get": {
-                "tags": [
-                    "producto-controller"
-                ],
-                "operationId": "listarMenu",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/ProductoDTO"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "tags": [
-                    "producto-controller"
-                ],
-                "operationId": "crear_2",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductoRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProductoDTO"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/inventario/compras": {
-            "post": {
-                "tags": [
-                    "inventario-controller"
-                ],
-                "operationId": "registrarCompra",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CompraRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/MovimientoInventario"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/inventario/ajustes": {
-            "post": {
-                "tags": [
-                    "inventario-controller"
-                ],
-                "operationId": "registrarAjuste",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AjusteRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/MovimientoInventario"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/ingredientes": {
-            "get": {
-                "tags": [
-                    "ingrediente-controller"
-                ],
-                "operationId": "listar_2",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/Ingrediente"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "tags": [
-                    "ingrediente-controller"
-                ],
-                "operationId": "crear_3",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/IngredienteRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Ingrediente"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/categorias": {
-            "get": {
-                "tags": [
-                    "categoria-controller"
-                ],
-                "operationId": "listar_3",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/Categoria"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "post": {
-                "tags": [
-                    "categoria-controller"
-                ],
-                "operationId": "crear_4",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CategoriaRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Categoria"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/auth/login": {
-            "post": {
-                "tags": [
-                    "auth-controller"
-                ],
-                "operationId": "login",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/LoginRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/LoginResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/usuarios/{id}/password": {
-            "patch": {
-                "tags": [
-                    "usuario-controller"
-                ],
-                "operationId": "cambiarPassword",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CambiarPasswordRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    }
-                }
-            }
-        },
-        "/api/ventas/{id}": {
-            "get": {
-                "tags": [
-                    "venta-controller"
-                ],
-                "operationId": "detalle",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/VentaResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/ventas/resumen": {
-            "get": {
-                "tags": [
-                    "venta-controller"
-                ],
-                "operationId": "resumen",
-                "parameters": [
-                    {
-                        "name": "fecha",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ResumenDia"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/inventario/movimientos": {
-            "get": {
-                "tags": [
-                    "inventario-controller"
-                ],
-                "operationId": "listarMovimientos",
-                "parameters": [
-                    {
-                        "name": "ingredienteId",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/MovimientoInventario"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/ingredientes/stock-bajo": {
-            "get": {
-                "tags": [
-                    "ingrediente-controller"
-                ],
-                "operationId": "stockBajo",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/Ingrediente"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    },
-    "components": {
-        "schemas": {
-            "ActualizarUsuarioRequest": {
-                "required": [
-                    "email",
-                    "nombre",
-                    "rol"
-                ],
-                "type": "object",
-                "properties": {
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "email": {
-                        "type": "string"
-                    },
-                    "rol": {
-                        "type": "string",
-                        "enum": [
-                            "ADMIN",
-                            "BARISTA"
-                        ]
-                    }
-                }
-            },
-            "UsuarioDTO": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "email": {
-                        "type": "string"
-                    },
-                    "rol": {
-                        "type": "string"
-                    },
-                    "activo": {
-                        "type": "boolean"
-                    },
-                    "creadoEn": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                }
-            },
-            "ProductoRequest": {
-                "required": [
-                    "nombre",
-                    "precioVenta"
-                ],
-                "type": "object",
-                "properties": {
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "precioVenta": {
-                        "type": "number"
-                    },
-                    "categoriaId": {
-                        "type": "integer",
-                        "format": "int64"
-                    }
-                }
-            },
-            "ProductoDTO": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "precioVenta": {
-                        "type": "number"
-                    },
-                    "categoria": {
-                        "type": "string"
-                    }
-                }
-            },
-            "RecetaLineaRequest": {
-                "required": [
-                    "cantidad",
-                    "ingredienteId"
-                ],
-                "type": "object",
-                "properties": {
-                    "ingredienteId": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "cantidad": {
-                        "type": "number"
-                    }
-                }
-            },
-            "RecetaLineaDTO": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "ingredienteId": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "ingredienteNombre": {
-                        "type": "string"
-                    },
-                    "unidad": {
-                        "type": "string"
-                    },
-                    "cantidad": {
-                        "type": "number"
-                    }
-                }
-            },
-            "IngredienteRequest": {
-                "required": [
-                    "costoUnitario",
-                    "nombre",
-                    "stockMinimo",
-                    "unidad"
-                ],
-                "type": "object",
-                "properties": {
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "unidad": {
-                        "type": "string"
-                    },
-                    "stockMinimo": {
-                        "type": "number"
-                    },
-                    "costoUnitario": {
-                        "type": "number"
-                    }
-                }
-            },
-            "Ingrediente": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "unidad": {
-                        "type": "string"
-                    },
-                    "stockActual": {
-                        "type": "number"
-                    },
-                    "stockMinimo": {
-                        "type": "number"
-                    },
-                    "costoUnitario": {
-                        "type": "number"
-                    },
-                    "actualizadoEn": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                }
-            },
-            "CategoriaRequest": {
-                "required": [
-                    "nombre"
-                ],
-                "type": "object",
-                "properties": {
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "orden": {
-                        "type": "integer",
-                        "format": "int32"
-                    }
-                }
-            },
-            "Categoria": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "orden": {
-                        "type": "integer",
-                        "format": "int32"
-                    }
-                }
-            },
-            "CrearVentaRequest": {
-                "required": [
-                    "items"
-                ],
-                "type": "object",
-                "properties": {
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/Item"
-                        }
-                    },
-                    "metodoPago": {
-                        "type": "string"
-                    }
-                }
-            },
-            "Item": {
-                "required": [
-                    "productoId"
-                ],
-                "type": "object",
-                "properties": {
-                    "productoId": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "cantidad": {
-                        "minimum": 1,
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "notas": {
-                        "type": "string"
-                    }
-                }
-            },
-            "ItemResponse": {
-                "type": "object",
-                "properties": {
-                    "nombreProducto": {
-                        "type": "string"
-                    },
-                    "cantidad": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "precioUnitario": {
-                        "type": "number"
-                    },
-                    "costoUnitario": {
-                        "type": "number"
-                    },
-                    "notas": {
-                        "type": "string"
-                    }
-                }
-            },
-            "VentaResponse": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "total": {
-                        "type": "number"
-                    },
-                    "costoTotal": {
-                        "type": "number"
-                    },
-                    "metodoPago": {
-                        "type": "string"
-                    },
-                    "creadaEn": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/ItemResponse"
-                        }
-                    }
-                }
-            },
-            "CrearUsuarioRequest": {
-                "required": [
-                    "email",
-                    "nombre",
-                    "password",
-                    "rol"
-                ],
-                "type": "object",
-                "properties": {
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "email": {
-                        "type": "string"
-                    },
-                    "password": {
-                        "maxLength": 2147483647,
-                        "minLength": 8,
-                        "type": "string"
-                    },
-                    "rol": {
-                        "type": "string",
-                        "enum": [
-                            "ADMIN",
-                            "BARISTA"
-                        ]
-                    }
-                }
-            },
-            "CompraRequest": {
-                "required": [
-                    "lineas"
-                ],
-                "type": "object",
-                "properties": {
-                    "lineas": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/LineaCompraRequest"
-                        }
-                    }
-                }
-            },
-            "LineaCompraRequest": {
-                "required": [
-                    "cantidad",
-                    "ingredienteId"
-                ],
-                "type": "object",
-                "properties": {
-                    "ingredienteId": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "cantidad": {
-                        "type": "number"
-                    },
-                    "nota": {
-                        "type": "string"
-                    }
-                }
-            },
-            "MovimientoInventario": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "ingredienteId": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "tipo": {
-                        "type": "string"
-                    },
-                    "cantidad": {
-                        "type": "number"
-                    },
-                    "ventaId": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "nota": {
-                        "type": "string"
-                    },
-                    "creadoEn": {
-                        "type": "string",
-                        "format": "date-time"
-                    }
-                }
-            },
-            "AjusteRequest": {
-                "required": [
-                    "cantidad",
-                    "ingredienteId",
-                    "tipo"
-                ],
-                "type": "object",
-                "properties": {
-                    "ingredienteId": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "cantidad": {
-                        "type": "number"
-                    },
-                    "tipo": {
-                        "pattern": "MERMA|AJUSTE",
-                        "type": "string"
-                    },
-                    "nota": {
-                        "type": "string"
-                    }
-                }
-            },
-            "LoginRequest": {
-                "required": [
-                    "email",
-                    "password"
-                ],
-                "type": "object",
-                "properties": {
-                    "email": {
-                        "type": "string"
-                    },
-                    "password": {
-                        "type": "string"
-                    }
-                }
-            },
-            "LoginResponse": {
-                "type": "object",
-                "properties": {
-                    "token": {
-                        "type": "string"
-                    },
-                    "nombre": {
-                        "type": "string"
-                    },
-                    "rol": {
-                        "type": "string"
-                    }
-                }
-            },
-            "CambiarPasswordRequest": {
-                "required": [
-                    "passwordNueva"
-                ],
-                "type": "object",
-                "properties": {
-                    "passwordActual": {
-                        "type": "string"
-                    },
-                    "passwordNueva": {
-                        "maxLength": 2147483647,
-                        "minLength": 8,
-                        "type": "string"
-                    }
-                }
-            },
-            "ResumenDia": {
-                "type": "object",
-                "properties": {
-                    "fecha": {
-                        "type": "string",
-                        "format": "date"
-                    },
-                    "totalVentas": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "ingresos": {
-                        "type": "number"
-                    },
-                    "costos": {
-                        "type": "number"
-                    },
-                    "utilidad": {
-                        "type": "number"
-                    },
-                    "ventasPorMetodoPago": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "integer",
-                            "format": "int64"
-                        }
-                    }
-                }
-            }
-        }
+  "openapi": "3.0.1",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
     }
+  ],
+  "paths": {
+    "/api/usuarios/{id}": {
+      "put": {
+        "tags": [
+          "usuario-controller"
+        ],
+        "operationId": "actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarUsuarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "usuario-controller"
+        ],
+        "operationId": "desactivar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/productos/{id}": {
+      "put": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "actualizar_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "desactivar_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/productos/{id}/receta": {
+      "get": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "obtenerReceta",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RecetaLineaDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "reemplazarReceta",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RecetaLineaRequest"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RecetaLineaDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modificadores/{id}": {
+      "put": {
+        "tags": [
+          "modificador-controller"
+        ],
+        "operationId": "actualizar_2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrupoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModificadorGrupo"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "modificador-controller"
+        ],
+        "operationId": "eliminar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/modificadores/opciones/{opcionId}": {
+      "put": {
+        "tags": [
+          "modificador-controller"
+        ],
+        "operationId": "actualizarOpcion",
+        "parameters": [
+          {
+            "name": "opcionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpcionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModificadorOpcion"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "modificador-controller"
+        ],
+        "operationId": "eliminarOpcion",
+        "parameters": [
+          {
+            "name": "opcionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/ingredientes/{id}": {
+      "put": {
+        "tags": [
+          "ingrediente-controller"
+        ],
+        "operationId": "actualizar_3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngredienteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ingrediente"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categorias/{id}": {
+      "put": {
+        "tags": [
+          "categoria-controller"
+        ],
+        "operationId": "actualizar_4",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoriaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Categoria"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "categoria-controller"
+        ],
+        "operationId": "eliminar_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/ventas": {
+      "get": {
+        "tags": [
+          "venta-controller"
+        ],
+        "operationId": "listar",
+        "parameters": [
+          {
+            "name": "fecha",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VentaResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "venta-controller"
+        ],
+        "operationId": "crear",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearVentaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios": {
+      "get": {
+        "tags": [
+          "usuario-controller"
+        ],
+        "operationId": "listar_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UsuarioDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "usuario-controller"
+        ],
+        "operationId": "crear_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearUsuarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productos": {
+      "get": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "listarMenu",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductoDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "crear_2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productos/{id}/modificadores/{grupoId}": {
+      "post": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "asignarModificador",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "grupoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "quitarModificador",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "grupoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/modificadores": {
+      "get": {
+        "tags": [
+          "modificador-controller"
+        ],
+        "operationId": "listar_2",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModificadorGrupo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "modificador-controller"
+        ],
+        "operationId": "crear_3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrupoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModificadorGrupo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modificadores/{grupoId}/opciones": {
+      "post": {
+        "tags": [
+          "modificador-controller"
+        ],
+        "operationId": "agregarOpcion",
+        "parameters": [
+          {
+            "name": "grupoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpcionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModificadorOpcion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventario/compras": {
+      "post": {
+        "tags": [
+          "inventario-controller"
+        ],
+        "operationId": "registrarCompra",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompraRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MovimientoInventario"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventario/ajustes": {
+      "post": {
+        "tags": [
+          "inventario-controller"
+        ],
+        "operationId": "registrarAjuste",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AjusteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovimientoInventario"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ingredientes": {
+      "get": {
+        "tags": [
+          "ingrediente-controller"
+        ],
+        "operationId": "listar_3",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ingrediente"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ingrediente-controller"
+        ],
+        "operationId": "crear_4",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngredienteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ingrediente"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categorias": {
+      "get": {
+        "tags": [
+          "categoria-controller"
+        ],
+        "operationId": "listar_4",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Categoria"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "categoria-controller"
+        ],
+        "operationId": "crear_5",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoriaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Categoria"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios/{id}/password": {
+      "patch": {
+        "tags": [
+          "usuario-controller"
+        ],
+        "operationId": "cambiarPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiarPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/ventas/{id}": {
+      "get": {
+        "tags": [
+          "venta-controller"
+        ],
+        "operationId": "detalle",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ventas/resumen": {
+      "get": {
+        "tags": [
+          "venta-controller"
+        ],
+        "operationId": "resumen",
+        "parameters": [
+          {
+            "name": "fecha",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumenDia"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/productos/{id}/modificadores": {
+      "get": {
+        "tags": [
+          "producto-controller"
+        ],
+        "operationId": "listarModificadores",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModificadorGrupo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventario/movimientos": {
+      "get": {
+        "tags": [
+          "inventario-controller"
+        ],
+        "operationId": "listarMovimientos",
+        "parameters": [
+          {
+            "name": "ingredienteId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MovimientoInventario"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ingredientes/stock-bajo": {
+      "get": {
+        "tags": [
+          "ingrediente-controller"
+        ],
+        "operationId": "stockBajo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ingrediente"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActualizarUsuarioRequest": {
+        "required": [
+          "email",
+          "nombre",
+          "rol"
+        ],
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "BARISTA"
+            ]
+          }
+        }
+      },
+      "UsuarioDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "rol": {
+            "type": "string"
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "creadoEn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProductoRequest": {
+        "required": [
+          "nombre",
+          "precioVenta"
+        ],
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "precioVenta": {
+            "type": "number"
+          },
+          "categoriaId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ProductoDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "precioVenta": {
+            "type": "number"
+          },
+          "categoria": {
+            "type": "string"
+          }
+        }
+      },
+      "RecetaLineaRequest": {
+        "required": [
+          "cantidad",
+          "ingredienteId"
+        ],
+        "type": "object",
+        "properties": {
+          "ingredienteId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cantidad": {
+            "type": "number"
+          }
+        }
+      },
+      "RecetaLineaDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ingredienteId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ingredienteNombre": {
+            "type": "string"
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "cantidad": {
+            "type": "number"
+          }
+        }
+      },
+      "GrupoRequest": {
+        "required": [
+          "nombre"
+        ],
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "seleccionMin": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seleccionMax": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "Ingrediente": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "stockActual": {
+            "type": "number"
+          },
+          "stockMinimo": {
+            "type": "number"
+          },
+          "costoUnitario": {
+            "type": "number"
+          },
+          "actualizadoEn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModificadorGrupo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "seleccionMin": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seleccionMax": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "creadoEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "opciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModificadorOpcion"
+            }
+          }
+        }
+      },
+      "ModificadorOpcion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "precioExtra": {
+            "type": "number"
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "ingrediente": {
+            "$ref": "#/components/schemas/Ingrediente"
+          },
+          "cantidad": {
+            "type": "number"
+          }
+        }
+      },
+      "OpcionRequest": {
+        "required": [
+          "nombre",
+          "precioExtra"
+        ],
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "precioExtra": {
+            "type": "number"
+          },
+          "ingredienteId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cantidad": {
+            "type": "number"
+          }
+        }
+      },
+      "IngredienteRequest": {
+        "required": [
+          "costoUnitario",
+          "nombre",
+          "stockMinimo",
+          "unidad"
+        ],
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "stockMinimo": {
+            "type": "number"
+          },
+          "costoUnitario": {
+            "type": "number"
+          }
+        }
+      },
+      "CategoriaRequest": {
+        "required": [
+          "nombre"
+        ],
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "orden": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "Categoria": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "orden": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CrearVentaRequest": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            }
+          },
+          "metodoPago": {
+            "type": "string"
+          }
+        }
+      },
+      "Item": {
+        "required": [
+          "productoId"
+        ],
+        "type": "object",
+        "properties": {
+          "productoId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cantidad": {
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32"
+          },
+          "notas": {
+            "type": "string"
+          },
+          "modificadorOpcionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "ItemResponse": {
+        "type": "object",
+        "properties": {
+          "nombreProducto": {
+            "type": "string"
+          },
+          "cantidad": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "precioUnitario": {
+            "type": "number"
+          },
+          "costoUnitario": {
+            "type": "number"
+          },
+          "notas": {
+            "type": "string"
+          },
+          "modificadores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModificadorResponse"
+            }
+          }
+        }
+      },
+      "ModificadorResponse": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "precioExtra": {
+            "type": "number"
+          }
+        }
+      },
+      "VentaResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "number"
+          },
+          "costoTotal": {
+            "type": "number"
+          },
+          "metodoPago": {
+            "type": "string"
+          },
+          "creadaEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemResponse"
+            }
+          }
+        }
+      },
+      "CrearUsuarioRequest": {
+        "required": [
+          "email",
+          "nombre",
+          "password",
+          "rol"
+        ],
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 2147483647,
+            "minLength": 8,
+            "type": "string"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "BARISTA"
+            ]
+          }
+        }
+      },
+      "CompraRequest": {
+        "required": [
+          "lineas"
+        ],
+        "type": "object",
+        "properties": {
+          "lineas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineaCompraRequest"
+            }
+          }
+        }
+      },
+      "LineaCompraRequest": {
+        "required": [
+          "cantidad",
+          "ingredienteId"
+        ],
+        "type": "object",
+        "properties": {
+          "ingredienteId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "nota": {
+            "type": "string"
+          }
+        }
+      },
+      "MovimientoInventario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ingredienteId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tipo": {
+            "type": "string"
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "ventaId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nota": {
+            "type": "string"
+          },
+          "creadoEn": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AjusteRequest": {
+        "required": [
+          "cantidad",
+          "ingredienteId",
+          "tipo"
+        ],
+        "type": "object",
+        "properties": {
+          "ingredienteId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "tipo": {
+            "pattern": "MERMA|AJUSTE",
+            "type": "string"
+          },
+          "nota": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginRequest": {
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "rol": {
+            "type": "string"
+          }
+        }
+      },
+      "CambiarPasswordRequest": {
+        "required": [
+          "passwordNueva"
+        ],
+        "type": "object",
+        "properties": {
+          "passwordActual": {
+            "type": "string"
+          },
+          "passwordNueva": {
+            "maxLength": 2147483647,
+            "minLength": 8,
+            "type": "string"
+          }
+        }
+      },
+      "ResumenDia": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date"
+          },
+          "totalVentas": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ingresos": {
+            "type": "number"
+          },
+          "costos": {
+            "type": "number"
+          },
+          "utilidad": {
+            "type": "number"
+          },
+          "ventasPorMetodoPago": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      }
+    }
+  }
 }

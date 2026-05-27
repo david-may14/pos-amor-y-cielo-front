@@ -8,6 +8,12 @@ import ProductosPage from './pages/ProductosPage'
 import IngredientesPage from './pages/IngredientesPage'
 import InventarioPage from './pages/InventarioPage'
 import UsuariosPage from './pages/UsuariosPage'
+import ModificadoresPage from './pages/ModificadoresPage'
+import CategoriasPage from './pages/CategoriasPage'
+import DescuentosPage from './pages/DescuentosPage'
+import AnalyticsPage from './pages/AnalyticsPage'
+import CajaPage from './pages/CajaPage'
+import ConfiguracionPage from './pages/ConfiguracionPage'
 
 function RequireAuth() {
   const { user } = useAuth()
@@ -29,12 +35,18 @@ export default function App() {
           <Route index element={<Navigate to="/pos" replace />} />
           <Route path="/pos" element={<POSPage />} />
           <Route path="/ventas" element={<VentasPage />} />
+          <Route path="/caja" element={<CajaPage />} />
 
           <Route element={<RequireAdmin />}>
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/productos" element={<ProductosPage />} />
             <Route path="/ingredientes" element={<IngredientesPage />} />
             <Route path="/inventario" element={<InventarioPage />} />
             <Route path="/usuarios" element={<UsuariosPage />} />
+            <Route path="/modificadores" element={<ModificadoresPage />} />
+            <Route path="/categorias" element={<CategoriasPage />} />
+            <Route path="/descuentos" element={<DescuentosPage />} />
+            <Route path="/configuracion" element={<ConfiguracionPage />} />
           </Route>
         </Route>
       </Route>

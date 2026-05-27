@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { listarVentas, resumenDia } from '../api/ventas'
+import { listarVentas, resumenDia, anularVenta } from '../api/ventas'
 import type { VentaResponse, ResumenDia } from '../types/api'
+import { useAuth } from '../contexts/AuthContext'
 import Spinner from '../components/Spinner'
 import Modal from '../components/Modal'
 
@@ -10,12 +11,14 @@ const fmt = (n: number) =>
 const hoy = () => new Date().toISOString().split('T')[0]
 
 export default function VentasPage() {
+  const { isAdmin } = useAuth()
   const [fecha, setFecha] = useState(hoy())
   const [ventas, setVentas] = useState<VentaResponse[]>([])
   const [resumen, setResumen] = useState<ResumenDia | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [detalle, setDetalle] = useState<VentaResponse | null>(null)
+  const [anulando, setAnulando] = useState<number | null>(null)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -32,6 +35,21 @@ export default function VentasPage() {
   }, [fecha])
 
   useEffect(() => { cargar() }, [cargar])
+
+  const handleAnular = async (v: VentaResponse) => {
+    if (!confirm(`¿Anular la venta #${v.id} por ${fmt(v.total)}? Se restaurará el inventario.`)) return
+    setAnulando(v.id)
+    setError('')
+    try {
+      const actualizada = await anularVenta(v.id)
+      setVentas((prev) => prev.map((x) => x.id === v.id ? actualizada : x))
+      if (detalle?.id === v.id) setDetalle(actualizada)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al anular')
+    } finally {
+      setAnulando(null)
+    }
+  }
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
@@ -58,12 +76,29 @@ export default function VentasPage() {
         <>
           {/* Resumen cards */}
           {resumen && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <ResumenCard label="Ventas" value={String(resumen.totalVentas)} />
-              <ResumenCard label="Ingresos" value={fmt(resumen.ingresos)} highlight />
-              <ResumenCard label="Costos" value={fmt(resumen.costos)} />
-              <ResumenCard label="Utilidad" value={fmt(resumen.utilidad)} green />
-            </div>
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-3">
+                <ResumenCard label="Ventas" value={String(resumen.totalVentas)} />
+                <ResumenCard label="Ingresos" value={fmt(resumen.ingresos)} highlight />
+                <ResumenCard label="Costos" value={fmt(resumen.costos)} />
+                <ResumenCard label="Utilidad neta" value={fmt(resumen.utilidad)} green />
+              </div>
+              {isAdmin && (resumen.totalIva > 0 || resumen.totalComisiones > 0) && (
+                <div className="card px-5 py-3 mb-6 flex gap-6 flex-wrap text-xs">
+                  <span className="text-stone-400">Desglose fiscal:</span>
+                  {resumen.totalIva > 0 && (
+                    <span className="text-stone-500">
+                      IVA incluido: <span className="font-semibold text-stone-700">{fmt(resumen.totalIva)}</span>
+                    </span>
+                  )}
+                  {resumen.totalComisiones > 0 && (
+                    <span className="text-stone-500">
+                      Comisiones tarjeta: <span className="font-semibold text-red-500">{fmt(resumen.totalComisiones)}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           {/* Métodos de pago */}
@@ -97,34 +132,47 @@ export default function VentasPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-50">
-                  {ventas.map((v) => (
-                    <tr key={v.id} className="hover:bg-surface-muted/50 transition-colors">
-                      <td className="px-5 py-3 font-medium text-stone-700">#{v.id}</td>
-                      <td className="px-5 py-3 text-stone-500">
-                        {new Date(v.creadaEn).toLocaleTimeString('es-MX', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </td>
-                      <td className="px-5 py-3 text-stone-500">{v.items.length}</td>
-                      <td className="px-5 py-3">
-                        <span className="inline-block bg-surface-muted text-stone-600 text-xs px-2 py-0.5 rounded-md">
-                          {v.metodoPago}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-right font-semibold text-stone-800">
-                        {fmt(v.total)}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          onClick={() => setDetalle(v)}
-                          className="text-xs text-forest hover:underline"
-                        >
-                          Ver detalle
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {ventas.map((v) => {
+                    const anulada = v.estado === 'ANULADA'
+                    return (
+                      <tr key={v.id} className={`transition-colors ${anulada ? 'bg-red-50/50 opacity-60' : 'hover:bg-surface-muted/50'}`}>
+                        <td className="px-5 py-3 font-medium text-stone-700">
+                          #{v.id}
+                          {anulada && (
+                            <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">anulada</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-stone-500">
+                          {new Date(v.creadaEn).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-5 py-3 text-stone-500">{v.items.length}</td>
+                        <td className="px-5 py-3">
+                          <span className="inline-block bg-surface-muted text-stone-600 text-xs px-2 py-0.5 rounded-md">
+                            {v.metodoPago}
+                          </span>
+                        </td>
+                        <td className={`px-5 py-3 text-right font-semibold ${anulada ? 'line-through text-stone-400' : 'text-stone-800'}`}>
+                          {fmt(v.total)}
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <button onClick={() => setDetalle(v)} className="text-xs text-forest hover:underline">
+                              Ver detalle
+                            </button>
+                            {!anulada && (
+                              <button
+                                onClick={() => handleAnular(v)}
+                                disabled={anulando === v.id}
+                                className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50"
+                              >
+                                {anulando === v.id ? '…' : 'Anular'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -134,35 +182,117 @@ export default function VentasPage() {
 
       {/* Detalle modal */}
       {detalle && (
-        <Modal title={`Venta #${detalle.id}`} onClose={() => setDetalle(null)} size="sm">
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm text-stone-500">
-              <span>{new Date(detalle.creadaEn).toLocaleString('es-MX')}</span>
-              <span className="font-medium">{detalle.metodoPago}</span>
+        <Modal
+          title={`Venta #${detalle.id}`}
+          onClose={() => setDetalle(null)}
+          size="sm"
+        >
+          <div className="space-y-4">
+            {/* Cabecera: fecha, método, estado */}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-stone-500">{new Date(detalle.creadaEn).toLocaleString('es-MX')}</span>
+              <div className="flex items-center gap-2">
+                <span className="bg-surface-muted text-stone-600 text-xs px-2 py-0.5 rounded-md font-medium">
+                  {detalle.metodoPago}
+                </span>
+                {detalle.estado === 'ANULADA' && (
+                  <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-md font-medium">ANULADA</span>
+                )}
+              </div>
             </div>
-            <div className="space-y-2 border-t border-stone-100 pt-3">
-              {detalle.items.map((item, i) => (
-                <div key={i} className="flex justify-between text-sm">
-                  <span className="text-stone-600">
-                    {item.cantidad}× {item.nombreProducto}
-                    {item.notas && (
-                      <span className="text-stone-400 italic"> — {item.notas}</span>
+
+            {/* Ítems */}
+            <div className="space-y-3 border-t border-stone-100 pt-3">
+              {detalle.items.map((item, i) => {
+                const bruto = item.precioUnitario * item.cantidad
+                const descMonto = item.descuentoMonto ?? 0
+                const neto = bruto - descMonto
+                const tieneDescuento = item.descuentoNombre != null && descMonto > 0
+                return (
+                  <div key={i}>
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-stone-700">{item.cantidad}× {item.nombreProducto}</span>
+                      <span className={tieneDescuento ? 'text-stone-400 line-through text-xs self-center' : 'font-medium text-stone-800'}>
+                        {fmt(bruto)}
+                      </span>
+                    </div>
+                    {item.modificadores.length > 0 && (
+                      <div className="mt-0.5 space-y-0.5 pl-3">
+                        {item.modificadores.map((m, j) => (
+                          <p key={j} className="text-xs text-stone-400">
+                            + {m.nombre}{m.precioExtra > 0 ? ` · +${fmt(m.precioExtra)}` : ''}
+                          </p>
+                        ))}
+                      </div>
                     )}
-                  </span>
-                  <span className="font-medium">{fmt(item.precioUnitario * item.cantidad)}</span>
-                </div>
-              ))}
+                    {item.notas && (
+                      <p className="text-xs text-stone-400 italic pl-3 mt-0.5">"{item.notas}"</p>
+                    )}
+                    {tieneDescuento && (
+                      <div className="pl-3 mt-1 space-y-0.5">
+                        <div className="flex justify-between text-xs text-emerald-600">
+                          <span>Desc. {item.descuentoNombre}</span>
+                          <span>−{fmt(descMonto)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm font-semibold text-stone-800">
+                          <span className="text-xs text-stone-400 font-normal">Subtotal</span>
+                          <span>{fmt(neto)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-            <div className="border-t border-stone-100 pt-3 space-y-1">
-              <div className="flex justify-between text-sm text-stone-500">
+
+            {/* Totales */}
+            <div className="border-t border-stone-100 pt-3 space-y-1.5">
+              {detalle.descuentoTicketNombre && detalle.descuentoTicketMonto != null && detalle.descuentoTicketMonto > 0 && (
+                <div className="flex justify-between text-sm text-emerald-600">
+                  <span>Desc. {detalle.descuentoTicketNombre}</span>
+                  <span>−{fmt(detalle.descuentoTicketMonto)}</span>
+                </div>
+              )}
+              {detalle.propina > 0 && (
+                <div className="flex justify-between text-sm text-amber-600">
+                  <span>Propina</span>
+                  <span>+{fmt(detalle.propina)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm text-stone-400">
                 <span>Costo</span>
                 <span>{fmt(detalle.costoTotal)}</span>
               </div>
-              <div className="flex justify-between font-semibold">
+              {isAdmin && detalle.ivaMonto > 0 && (
+                <div className="flex justify-between text-sm text-stone-400">
+                  <span>IVA incluido ({((detalle.ivaMonto / detalle.total) * 100).toFixed(1)}%)</span>
+                  <span>{fmt(detalle.ivaMonto)}</span>
+                </div>
+              )}
+              {isAdmin && detalle.comisionMonto > 0 && (
+                <div className="flex justify-between text-sm text-red-400">
+                  <span>Comisión terminal</span>
+                  <span>−{fmt(detalle.comisionMonto)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-base pt-1 border-t border-stone-100">
                 <span>Total</span>
-                <span className="text-forest text-lg">{fmt(detalle.total)}</span>
+                <span className={detalle.estado === 'ANULADA' ? 'line-through text-stone-400' : 'text-forest'}>
+                  {fmt(detalle.total + (detalle.propina ?? 0))}
+                </span>
               </div>
             </div>
+
+            {/* Acción anular */}
+            {detalle.estado !== 'ANULADA' && (
+              <button
+                onClick={() => handleAnular(detalle)}
+                disabled={anulando === detalle.id}
+                className="w-full text-sm text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400 rounded-xl py-2 transition-colors disabled:opacity-50"
+              >
+                {anulando === detalle.id ? 'Anulando…' : 'Anular esta venta'}
+              </button>
+            )}
           </div>
         </Modal>
       )}

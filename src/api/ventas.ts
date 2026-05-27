@@ -10,5 +10,12 @@ export const detalleVenta = (id: number) =>
 export const resumenDia = (fecha?: string) =>
   api.get<ResumenDia>(`/api/ventas/resumen${fecha ? `?fecha=${fecha}` : ''}`)
 
-export const crearVenta = (items: ItemRequest[], metodoPago: string) =>
-  api.post<VentaResponse>('/api/ventas', { items, metodoPago })
+export const anularVenta = (id: number) =>
+  api.post<VentaResponse>(`/api/ventas/${id}/anular`, {})
+
+export const crearVenta = (
+  items: ItemRequest[],
+  metodoPago: string,
+  descuentoTicketId?: number | null,
+  propina?: number,
+) => api.post<VentaResponse>('/api/ventas', { items, metodoPago, descuentoTicketId, propina: propina ?? 0 })

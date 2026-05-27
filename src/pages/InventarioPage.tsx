@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { listarMovimientos, registrarCompra, registrarAjuste } from '../api/inventario'
-import { listarIngredientes } from '../api/ingredientes'
-import type { MovimientoInventario, Ingrediente, TipoAjuste } from '../types/api'
+import { listarIngredientes, obtenerSubreceta, producirIngrediente } from '../api/ingredientes'
+import type { MovimientoInventario, Ingrediente, TipoAjuste, SubrecetaDTO } from '../types/api'
 import Spinner from '../components/Spinner'
 
-type Tab = 'compras' | 'ajustes' | 'historial'
+type Tab = 'stock' | 'compras' | 'ajustes' | 'produccion' | 'historial'
 
 interface LineaCompra {
   ingredienteId: string
@@ -13,12 +13,13 @@ interface LineaCompra {
 }
 
 export default function InventarioPage() {
-  const [tab, setTab] = useState<Tab>('compras')
+  const [tab, setTab] = useState<Tab>('stock')
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([])
   const [movimientos, setMovimientos] = useState<MovimientoInventario[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [busqueda, setBusqueda] = useState('')
 
   // Compras form
   const [lineas, setLineas] = useState<LineaCompra[]>([{ ingredienteId: '', cantidad: '', nota: '' }])
@@ -27,6 +28,13 @@ export default function InventarioPage() {
   // Ajustes form
   const [ajuste, setAjuste] = useState({ ingredienteId: '', cantidad: '', tipo: 'AJUSTE' as TipoAjuste, nota: '' })
   const [savingAjuste, setSavingAjuste] = useState(false)
+
+  // Producción form
+  const [prodIngId, setProdIngId] = useState('')
+  const [prodLotes, setProdLotes] = useState('1')
+  const [prodSubreceta, setProdSubreceta] = useState<SubrecetaDTO | null>(null)
+  const [prodLoadingSubreceta, setProdLoadingSubreceta] = useState(false)
+  const [savingProd, setSavingProd] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -94,6 +102,41 @@ export default function InventarioPage() {
     }
   }
 
+  const handleSeleccionarElaborado = async (id: string) => {
+    setProdIngId(id)
+    setProdSubreceta(null)
+    if (!id) return
+    setProdLoadingSubreceta(true)
+    try {
+      const data = await obtenerSubreceta(parseInt(id))
+      setProdSubreceta(data)
+    } catch { /* ignore */ }
+    finally { setProdLoadingSubreceta(false) }
+  }
+
+  const handleProducir = async () => {
+    if (!prodIngId) { setError('Selecciona un ingrediente elaborado'); return }
+    const lotes = parseFloat(prodLotes)
+    if (isNaN(lotes) || lotes <= 0) { setError('Los lotes deben ser > 0'); return }
+    setSavingProd(true)
+    setError('')
+    setSuccess('')
+    try {
+      await producirIngrediente(parseInt(prodIngId), lotes)
+      const ings = await listarIngredientes()
+      setIngredientes(ings)
+      setProdIngId('')
+      setProdLotes('1')
+      setProdSubreceta(null)
+      setSuccess(`Producción registrada correctamente`)
+      await recargarMovimientos()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al registrar producción')
+    } finally {
+      setSavingProd(false)
+    }
+  }
+
   const addLinea = () => setLineas((prev) => [...prev, { ingredienteId: '', cantidad: '', nota: '' }])
   const removeLinea = (i: number) => setLineas((prev) => prev.filter((_, idx) => idx !== i))
   const updateLinea = (i: number, field: keyof LineaCompra, value: string) =>
@@ -116,15 +159,15 @@ export default function InventarioPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-surface-muted rounded-xl p-1 w-fit mb-6">
-        {(['compras', 'ajustes', 'historial'] as Tab[]).map((t) => (
+        {([['stock', 'Stock'], ['compras', 'Compras'], ['ajustes', 'Ajustes'], ['produccion', 'Producción'], ['historial', 'Historial']] as [Tab, string][]).map(([t, label]) => (
           <button
             key={t}
             onClick={() => { setTab(t); setError(''); setSuccess('') }}
-            className={`px-5 py-2 text-sm font-medium rounded-lg capitalize transition-colors ${
+            className={`px-5 py-2 text-sm font-medium rounded-lg transition-colors ${
               tab === t ? 'bg-white text-forest shadow-sm' : 'text-stone-500 hover:text-stone-700'
             }`}
           >
-            {t}
+            {label}
           </button>
         ))}
       </div>
@@ -134,6 +177,98 @@ export default function InventarioPage() {
       )}
       {success && (
         <div className="bg-green-50 text-green-700 text-sm rounded-lg px-4 py-3 mb-5">{success}</div>
+      )}
+
+      {/* Stock actual */}
+      {tab === 'stock' && (
+        <div className="space-y-5">
+          <div className="relative max-w-xs">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <input
+              className="input pl-9 text-sm py-2"
+              placeholder="Buscar ingrediente…"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            {busqueda && (
+              <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-stone-100 text-left">
+                <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Ingrediente</th>
+                <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Stock actual</th>
+                <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Stock mín.</th>
+                <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Costo unitario</th>
+                <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-50">
+              {ingredientes.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-12 text-center text-stone-400">
+                    Sin ingredientes registrados
+                  </td>
+                </tr>
+              )}
+              {ingredientes.length > 0 && busqueda.trim() && [...ingredientes].filter((i) => i.nombre.toLowerCase().includes(busqueda.trim().toLowerCase())).length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-12 text-center text-stone-400">
+                    Sin resultados para "{busqueda}"
+                  </td>
+                </tr>
+              )}
+              {[...ingredientes]
+                .filter((i) => !busqueda.trim() || i.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
+                .sort((a, b) => {
+                  const aBajo = a.stockActual <= a.stockMinimo
+                  const bBajo = b.stockActual <= b.stockMinimo
+                  if (aBajo !== bBajo) return aBajo ? -1 : 1
+                  return a.nombre.localeCompare(b.nombre)
+                })
+                .map((ing) => {
+                  const bajo = ing.stockActual <= ing.stockMinimo
+                  const pct = ing.stockMinimo > 0
+                    ? Math.min(100, Math.round((ing.stockActual / ing.stockMinimo) * 100))
+                    : 100
+                  return (
+                    <tr key={ing.id} className={`hover:bg-surface-muted/50 ${bajo ? 'bg-amber-50/40' : ''}`}>
+                      <td className="px-5 py-3 font-medium text-stone-800">{ing.nombre}</td>
+                      <td className={`px-5 py-3 text-right font-semibold ${bajo ? 'text-amber-600' : 'text-stone-700'}`}>
+                        {ing.stockActual} {ing.unidad}
+                      </td>
+                      <td className="px-5 py-3 text-right text-stone-400">{ing.stockMinimo} {ing.unidad}</td>
+                      <td className="px-5 py-3 text-right text-stone-500">
+                        ${ing.costoUnitario}/{ing.unidad}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${bajo ? 'bg-amber-400' : 'bg-forest'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          {bajo && (
+                            <span className="text-xs text-amber-600 font-medium">Stock bajo</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+            </tbody>
+          </table>
+        </div>
+        </div>
       )}
 
       {/* Compras */}
@@ -263,6 +398,83 @@ export default function InventarioPage() {
             <button onClick={handleAjuste} disabled={savingAjuste} className="btn-primary w-full flex justify-center gap-2">
               {savingAjuste && <Spinner className="w-4 h-4 text-cream" />}
               {savingAjuste ? 'Registrando…' : 'Registrar ajuste'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Producción */}
+      {tab === 'produccion' && (
+        <div className="card p-6 max-w-lg">
+          <p className="text-sm text-stone-500 mb-5">
+            Registra la producción de un ingrediente elaborado. El sistema descontará los ingredientes base y sumará el resultado al stock.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="label">Ingrediente elaborado</label>
+              <select
+                className="input"
+                value={prodIngId}
+                onChange={(e) => handleSeleccionarElaborado(e.target.value)}
+              >
+                <option value="">Seleccionar…</option>
+                {ingredientes.filter(i => i.rendimientoLote != null).map(i => (
+                  <option key={i.id} value={i.id}>{i.nombre} ({i.stockActual} {i.unidad})</option>
+                ))}
+              </select>
+              {ingredientes.filter(i => i.rendimientoLote != null).length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Ningún ingrediente tiene sub-receta. Define una en la pantalla de Ingredientes.
+                </p>
+              )}
+            </div>
+
+            {prodLoadingSubreceta && <div className="flex justify-center py-4"><Spinner className="w-5 h-5 text-forest" /></div>}
+
+            {prodSubreceta && prodSubreceta.lineas.length > 0 && (
+              <div className="bg-surface-muted rounded-xl p-4 space-y-3">
+                <div>
+                  <label className="label">Número de lotes</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={prodLotes}
+                    onChange={(e) => setProdLotes(e.target.value)}
+                  />
+                </div>
+
+                <div className="border-t border-stone-200 pt-3 space-y-1">
+                  <p className="text-xs font-medium text-stone-500 uppercase">Resumen de producción</p>
+                  {prodSubreceta.lineas.map(l => {
+                    const consumo = (l.cantidad * parseFloat(prodLotes || '0')).toFixed(3)
+                    return (
+                      <div key={l.baseId} className="flex justify-between text-sm">
+                        <span className="text-stone-600">{l.baseNombre}</span>
+                        <span className="text-red-600 font-medium">−{consumo} {l.baseUnidad}</span>
+                      </div>
+                    )
+                  })}
+                  <div className="flex justify-between text-sm border-t border-stone-200 pt-1 mt-1">
+                    <span className="text-stone-600 font-medium">
+                      {ingredientes.find(i => i.id === parseInt(prodIngId))?.nombre}
+                    </span>
+                    <span className="text-green-600 font-medium">
+                      +{(prodSubreceta.rendimientoLote! * parseFloat(prodLotes || '0')).toFixed(3)} {prodSubreceta.unidad}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handleProducir}
+              disabled={savingProd || !prodIngId || !prodSubreceta}
+              className="btn-primary w-full flex justify-center gap-2"
+            >
+              {savingProd && <Spinner className="w-4 h-4 text-cream" />}
+              {savingProd ? 'Registrando…' : 'Registrar producción'}
             </button>
           </div>
         </div>

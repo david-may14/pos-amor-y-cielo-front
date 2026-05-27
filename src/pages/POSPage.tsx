@@ -1,17 +1,45 @@
 import { useState, useEffect, useCallback } from 'react'
-import { listarProductos } from '../api/productos'
+import { listarProductos, listarModificadoresProducto } from '../api/productos'
 import { listarCategorias } from '../api/categorias'
 import { crearVenta } from '../api/ventas'
-import type { ProductoDTO, Categoria, VentaResponse, MetodoPago } from '../types/api'
+import { getDescuentoAplicable, listarDescuentosTicket } from '../api/descuentos'
+import type {
+  ProductoDTO, Categoria, VentaResponse, MetodoPago, ModificadorGrupo, DescuentoView,
+} from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 
+interface CartMod {
+  opcionId: number
+  nombre: string
+  precioExtra: number
+}
+
+interface CartDiscount {
+  descuentoId: number
+  nombre: string
+  tipo: 'PORCENTAJE' | 'FIJO'
+  valor: number
+}
+
 interface CartItem {
+  lineId: string
   productoId: number
   nombre: string
-  precioUnitario: number
+  precioUnitario: number // base + mods
   cantidad: number
   notas: string
+  mods: CartMod[]
+  descuento: CartDiscount | null
+}
+
+interface ModModal {
+  producto: ProductoDTO
+  grupos: ModificadorGrupo[]
+  seleccion: Record<number, number[]>
+  descuentoAplicable: DescuentoView | null
+  descuentoActivo: boolean
+  cantidad: number
 }
 
 const METODOS: MetodoPago[] = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA']
@@ -19,24 +47,59 @@ const METODOS: MetodoPago[] = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA']
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
+const calcDescuentoMonto = (d: CartDiscount | DescuentoView, base: number): number => {
+  if (d.tipo === 'PORCENTAJE') return Math.round(base * d.valor) / 100
+  return Math.min(typeof (d as CartDiscount).descuentoId !== 'undefined' ? (d as CartDiscount).valor : (d as DescuentoView).valor, base)
+}
+
+const descuentoMontoItem = (item: CartItem): number => {
+  if (!item.descuento) return 0
+  const subtotal = item.precioUnitario * item.cantidad
+  return item.descuento.tipo === 'PORCENTAJE'
+    ? subtotal * item.descuento.valor / 100
+    : Math.min(item.descuento.valor, subtotal)
+}
+
+const fmtDescuento = (d: DescuentoView | CartDiscount) =>
+  d.tipo === 'PORCENTAJE' ? `${d.valor}%` : fmt(d.valor)
+
 export default function POSPage() {
   const [productos, setProductos] = useState<ProductoDTO[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedCategoria, setSelectedCategoria] = useState<string>('Todos')
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO')
+  const [propina, setPropina] = useState('')
+  const [propinaCustom, setPropinaCustom] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [ventaExitosa, setVentaExitosa] = useState<VentaResponse | null>(null)
-  const [expandedNotas, setExpandedNotas] = useState<Set<number>>(new Set())
+  const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
+
+  const [loadingMods, setLoadingMods] = useState<Set<number>>(new Set())
+  const [modModal, setModModal] = useState<ModModal | null>(null)
+  const [modError, setModError] = useState('')
+
+  // Descuentos para el ticket completo
+  const [descuentosTicket, setDescuentosTicket] = useState<DescuentoView[]>([])
+  const [descuentoTicket, setDescuentoTicket] = useState<DescuentoView | null>(null)
+
+  // Búsqueda y cambio
+  const [busqueda, setBusqueda] = useState('')
+  const [montoRecibido, setMontoRecibido] = useState('')
 
   const cargar = useCallback(async () => {
     setLoading(true)
     try {
-      const [prods, cats] = await Promise.all([listarProductos(), listarCategorias()])
+      const [prods, cats, dticket] = await Promise.all([
+        listarProductos(),
+        listarCategorias(),
+        listarDescuentosTicket().catch(() => [] as DescuentoView[]),
+      ])
       setProductos(prods)
       setCategorias(cats.sort((a, b) => a.orden - b.orden))
+      setDescuentosTicket(dticket)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al cargar')
     } finally {
@@ -46,47 +109,142 @@ export default function POSPage() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  const addToCart = (producto: ProductoDTO) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.productoId === producto.id)
+  const addLine = (producto: ProductoDTO, mods: CartMod[], descuento: CartDiscount | null, cantidad: number) => {
+    const precioUnitario = producto.precioVenta + mods.reduce((s, m) => s + m.precioExtra, 0)
+    // Sin mods, sin descuento y cantidad 1: acumula en línea existente idéntica
+    if (mods.length === 0 && descuento === null && cantidad === 1) {
+      const existing = cart.find((i) => i.productoId === producto.id && i.mods.length === 0 && i.descuento === null)
       if (existing) {
-        return prev.map((i) =>
-          i.productoId === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i
-        )
+        setCart((prev) => prev.map((i) =>
+          i.lineId === existing.lineId ? { ...i, cantidad: i.cantidad + 1 } : i
+        ))
+        return
       }
-      return [
-        ...prev,
-        { productoId: producto.id, nombre: producto.nombre, precioUnitario: producto.precioVenta, cantidad: 1, notas: '' },
-      ]
+    }
+    setCart((prev) => [...prev, {
+      lineId: `${producto.id}-${Date.now()}`,
+      productoId: producto.id,
+      nombre: producto.nombre,
+      precioUnitario,
+      cantidad,
+      notas: '',
+      mods,
+      descuento,
+    }])
+  }
+
+  const handleProductoClick = async (producto: ProductoDTO) => {
+    setLoadingMods((prev) => new Set(prev).add(producto.id))
+    try {
+      const [grupos, descuentoAplicable] = await Promise.all([
+        listarModificadoresProducto(producto.id),
+        getDescuentoAplicable(producto.id).catch(() => null),
+      ])
+      setModModal({ producto, grupos, seleccion: {}, descuentoAplicable, descuentoActivo: !!descuentoAplicable, cantidad: 1 })
+      setModError('')
+    } catch {
+      addLine(producto, [], null, 1)
+    } finally {
+      setLoadingMods((prev) => { const s = new Set(prev); s.delete(producto.id); return s })
+    }
+  }
+
+  const toggleOpcion = (grupoId: number, opcionId: number, max: number | null) => {
+    setModModal((prev) => {
+      if (!prev) return prev
+      const current = prev.seleccion[grupoId] ?? []
+      let next: number[]
+      if (max === 1) {
+        next = current.includes(opcionId) ? [] : [opcionId]
+      } else {
+        if (current.includes(opcionId)) {
+          next = current.filter((id) => id !== opcionId)
+        } else {
+          if (max !== null && current.length >= max) return prev
+          next = [...current, opcionId]
+        }
+      }
+      return { ...prev, seleccion: { ...prev.seleccion, [grupoId]: next } }
     })
   }
 
-  const updateCantidad = (productoId: number, delta: number) => {
+  const confirmarMods = () => {
+    if (!modModal) return
+    setModError('')
+    for (const grupo of modModal.grupos) {
+      const count = (modModal.seleccion[grupo.id] ?? []).length
+      if (count < grupo.seleccionMin) {
+        const s = grupo.seleccionMin > 1 ? 'opciones' : 'opción'
+        setModError(`"${grupo.nombre}": selecciona al menos ${grupo.seleccionMin} ${s}`)
+        return
+      }
+    }
+    const mods: CartMod[] = []
+    for (const grupo of modModal.grupos) {
+      for (const id of modModal.seleccion[grupo.id] ?? []) {
+        const op = grupo.opciones.find((o) => o.id === id)
+        if (op) mods.push({ opcionId: op.id, nombre: op.nombre, precioExtra: op.precioExtra })
+      }
+    }
+    const descuento: CartDiscount | null =
+      modModal.descuentoActivo && modModal.descuentoAplicable
+        ? {
+            descuentoId: modModal.descuentoAplicable.id,
+            nombre: modModal.descuentoAplicable.nombre,
+            tipo: modModal.descuentoAplicable.tipo,
+            valor: modModal.descuentoAplicable.valor,
+          }
+        : null
+    addLine(modModal.producto, mods, descuento, modModal.cantidad)
+    setModModal(null)
+  }
+
+  const updateCantidad = (lineId: string, delta: number) => {
     setCart((prev) =>
       prev
-        .map((i) => i.productoId === productoId ? { ...i, cantidad: i.cantidad + delta } : i)
+        .map((i) => i.lineId === lineId ? { ...i, cantidad: i.cantidad + delta } : i)
         .filter((i) => i.cantidad > 0)
     )
   }
 
-  const updateNotas = (productoId: number, notas: string) => {
-    setCart((prev) => prev.map((i) => i.productoId === productoId ? { ...i, notas } : i))
+  const updateNotas = (lineId: string, notas: string) => {
+    setCart((prev) => prev.map((i) => i.lineId === lineId ? { ...i, notas } : i))
   }
 
-  const toggleNotas = (productoId: number) => {
+  const toggleNotas = (lineId: string) => {
     setExpandedNotas((prev) => {
       const next = new Set(prev)
-      next.has(productoId) ? next.delete(productoId) : next.add(productoId)
+      next.has(lineId) ? next.delete(lineId) : next.add(lineId)
       return next
     })
+  }
+
+  const removeLine = (lineId: string) => {
+    setCart((prev) => prev.filter((i) => i.lineId !== lineId))
+    setExpandedNotas((prev) => { const next = new Set(prev); next.delete(lineId); return next })
   }
 
   const clearCart = () => {
     setCart([])
     setExpandedNotas(new Set())
+    setDescuentoTicket(null)
+    setMontoRecibido('')
+    setPropina('')
+    setPropinaCustom(false)
   }
 
-  const total = cart.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0)
+  // Totales
+  const subtotalItems = cart.reduce((sum, i) => sum + i.precioUnitario * i.cantidad, 0)
+  const totalDescuentosItems = cart.reduce((sum, i) => sum + descuentoMontoItem(i), 0)
+  const subtotalConDesc = subtotalItems - totalDescuentosItems
+  const descuentoTicketMonto = descuentoTicket
+    ? (descuentoTicket.tipo === 'PORCENTAJE'
+        ? subtotalConDesc * descuentoTicket.valor / 100
+        : Math.min(descuentoTicket.valor, subtotalConDesc))
+    : 0
+  const total = Math.max(0, subtotalConDesc - descuentoTicketMonto)
+  const propinaNum = parseFloat(propina) || 0
+  const totalConPropina = total + propinaNum
 
   const handleCobrar = async () => {
     if (cart.length === 0) return
@@ -97,8 +255,10 @@ export default function POSPage() {
         productoId: i.productoId,
         cantidad: i.cantidad,
         ...(i.notas ? { notas: i.notas } : {}),
+        ...(i.mods.length > 0 ? { modificadorOpcionIds: i.mods.map((m) => m.opcionId) } : {}),
+        ...(i.descuento ? { descuentoId: i.descuento.descuentoId } : {}),
       }))
-      const venta = await crearVenta(items, metodoPago)
+      const venta = await crearVenta(items, metodoPago, descuentoTicket?.id ?? null, propinaNum > 0 ? propinaNum : undefined)
       setVentaExitosa(venta)
       clearCart()
     } catch (e: unknown) {
@@ -108,10 +268,24 @@ export default function POSPage() {
     }
   }
 
-  const filteredProductos =
-    selectedCategoria === 'Todos'
-      ? productos
-      : productos.filter((p) => p.categoria === selectedCategoria)
+  const cambio = (() => {
+    if (metodoPago !== 'EFECTIVO' || !montoRecibido) return null
+    const monto = parseFloat(montoRecibido)
+    if (isNaN(monto)) return null
+    return monto - totalConPropina
+  })()
+
+  const billetesRapidos = (() => {
+    if (total <= 0) return []
+    const step = total < 100 ? 50 : 100
+    const start = Math.ceil((total + 0.01) / step) * step
+    return Array.from({ length: 4 }, (_, i) => start + step * i).filter((v) => v <= 2000)
+  })()
+
+  const filteredProductos = productos
+    .filter((p) => p.disponible)
+    .filter((p) => selectedCategoria === 'Todos' || p.categoria === selectedCategoria)
+    .filter((p) => !busqueda.trim() || p.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
 
   if (loading) {
     return (
@@ -125,7 +299,6 @@ export default function POSPage() {
     <div className="flex-1 flex overflow-hidden">
       {/* ── Productos ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Category tabs */}
         <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 flex gap-1 overflow-x-auto">
           {['Todos', ...categorias.map((c) => c.nombre)].map((cat) => (
             <button
@@ -142,8 +315,28 @@ export default function POSPage() {
           ))}
         </div>
 
-        {/* Product grid */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-shrink-0 px-4 pt-3 pb-2">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <input
+              className="input pl-9 text-sm py-2"
+              placeholder="Buscar producto…"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            {busqueda && (
+              <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 pt-2">
           {error && (
             <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">{error}</div>
           )}
@@ -154,24 +347,26 @@ export default function POSPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {filteredProductos.map((p) => {
-                const inCart = cart.find((i) => i.productoId === p.id)
+                const cantEnCart = cart.filter((i) => i.productoId === p.id).reduce((s, i) => s + i.cantidad, 0)
+                const isLoadingMod = loadingMods.has(p.id)
                 return (
                   <button
                     key={p.id}
-                    onClick={() => addToCart(p)}
+                    onClick={() => handleProductoClick(p)}
+                    disabled={isLoadingMod}
                     className={`card text-left p-4 hover:shadow-md hover:border-forest/30 transition-all active:scale-95 ${
-                      inCart ? 'ring-2 ring-forest/40 border-forest/20' : ''
-                    }`}
+                      cantEnCart > 0 ? 'ring-2 ring-forest/40 border-forest/20' : ''
+                    } ${isLoadingMod ? 'opacity-60 cursor-wait' : ''}`}
                   >
-                    {inCart && (
+                    {isLoadingMod ? (
+                      <Spinner className="w-4 h-4 text-forest mb-2" />
+                    ) : cantEnCart > 0 ? (
                       <span className="inline-flex items-center justify-center bg-forest text-cream text-xs font-bold w-5 h-5 rounded-full mb-2">
-                        {inCart.cantidad}
+                        {cantEnCart}
                       </span>
-                    )}
+                    ) : null}
                     <p className="font-medium text-stone-800 text-sm leading-snug">{p.nombre}</p>
-                    {p.categoria && (
-                      <p className="text-xs text-stone-400 mt-0.5">{p.categoria}</p>
-                    )}
+                    {p.categoria && <p className="text-xs text-stone-400 mt-0.5">{p.categoria}</p>}
                     <p className="text-forest font-semibold text-sm mt-2">{fmt(p.precioVenta)}</p>
                   </button>
                 )
@@ -192,7 +387,6 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* Cart items */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-stone-300 gap-3">
@@ -202,66 +396,93 @@ export default function POSPage() {
               <p className="text-sm">Agrega productos para comenzar</p>
             </div>
           ) : (
-            cart.map((item) => (
-              <div key={item.productoId} className="bg-surface-muted rounded-xl p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-stone-800 truncate">{item.nombre}</p>
-                    <p className="text-xs text-stone-400">{fmt(item.precioUnitario)} c/u</p>
+            cart.map((item) => {
+              const itemDescMonto = descuentoMontoItem(item)
+              const itemTotal = item.precioUnitario * item.cantidad - itemDescMonto
+              return (
+                <div key={item.lineId} className="bg-surface-muted rounded-xl p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-sm font-medium text-stone-800 truncate">{item.nombre}</p>
+                        <button
+                          onClick={() => removeLine(item.lineId)}
+                          className="flex-shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5 transition-colors"
+                          title="Eliminar"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                          </svg>
+                        </button>
+                      </div>
+                      {item.mods.length > 0 && (
+                        <div className="mt-0.5">
+                          {item.mods.map((m) => (
+                            <p key={m.opcionId} className="text-xs text-stone-400">
+                              + {m.nombre}{m.precioExtra > 0 ? ` (${fmt(m.precioExtra)})` : ''}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {item.descuento && (
+                        <p className="text-xs text-emerald-600 mt-0.5">
+                          − {item.descuento.nombre} ({fmtDescuento(item.descuento)})
+                        </p>
+                      )}
+                      <p className="text-xs text-stone-400 mt-0.5">{fmt(item.precioUnitario)} c/u</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => updateCantidad(item.lineId, -1)}
+                        className="w-7 h-7 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-100 flex items-center justify-center text-base leading-none"
+                      >
+                        −
+                      </button>
+                      <span className="text-sm font-semibold w-4 text-center">{item.cantidad}</span>
+                      <button
+                        onClick={() => updateCantidad(item.lineId, 1)}
+                        className="w-7 h-7 rounded-lg bg-forest text-cream hover:bg-forest-dark flex items-center justify-center text-base leading-none"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+
+                  <div className="flex items-center justify-between mt-2">
                     <button
-                      onClick={() => updateCantidad(item.productoId, -1)}
-                      className="w-7 h-7 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-100 flex items-center justify-center text-base leading-none"
+                      onClick={() => toggleNotas(item.lineId)}
+                      className="text-xs text-stone-400 hover:text-forest transition-colors"
                     >
-                      −
+                      {expandedNotas.has(item.lineId) ? 'Ocultar notas' : 'Agregar notas'}
                     </button>
-                    <span className="text-sm font-semibold w-4 text-center">{item.cantidad}</span>
-                    <button
-                      onClick={() => updateCantidad(item.productoId, 1)}
-                      className="w-7 h-7 rounded-lg bg-forest text-cream hover:bg-forest-dark flex items-center justify-center text-base leading-none"
-                    >
-                      +
-                    </button>
+                    <p className="text-sm font-semibold text-forest">{fmt(itemTotal)}</p>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between mt-2">
-                  <button
-                    onClick={() => toggleNotas(item.productoId)}
-                    className="text-xs text-stone-400 hover:text-forest transition-colors"
-                  >
-                    {expandedNotas.has(item.productoId) ? 'Ocultar notas' : 'Agregar notas'}
-                  </button>
-                  <p className="text-sm font-semibold text-forest">
-                    {fmt(item.precioUnitario * item.cantidad)}
-                  </p>
+                  {expandedNotas.has(item.lineId) && (
+                    <input
+                      type="text"
+                      value={item.notas}
+                      onChange={(e) => updateNotas(item.lineId, e.target.value)}
+                      placeholder="Sin azúcar, leche de avena…"
+                      className="input mt-2 text-xs py-1.5"
+                    />
+                  )}
                 </div>
-
-                {expandedNotas.has(item.productoId) && (
-                  <input
-                    type="text"
-                    value={item.notas}
-                    onChange={(e) => updateNotas(item.productoId, e.target.value)}
-                    placeholder="Sin azúcar, leche de avena…"
-                    className="input mt-2 text-xs py-1.5"
-                  />
-                )}
-              </div>
-            ))
+              )
+            })
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-stone-100 space-y-4">
-          {/* Payment method */}
+        <div className="px-5 py-4 border-t border-stone-100 space-y-3">
+          {/* Método de pago */}
           <div>
             <p className="text-xs font-medium text-stone-500 mb-2">Método de pago</p>
             <div className="flex gap-2">
               {METODOS.map((m) => (
                 <button
                   key={m}
-                  onClick={() => setMetodoPago(m)}
+                  onClick={() => { setMetodoPago(m); setMontoRecibido('') }}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                     metodoPago === m
                       ? 'bg-forest text-cream border-forest'
@@ -274,10 +495,156 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Total */}
+          {/* Monto recibido + cambio (solo efectivo) */}
+          {metodoPago === 'EFECTIVO' && cart.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-stone-500 mb-1.5">Monto recibido</p>
+
+              {/* Botones rápidos */}
+              <div className="flex gap-1.5 mb-2">
+                {billetesRapidos.map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setMontoRecibido(String(b))}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                      montoRecibido === String(b)
+                        ? 'bg-forest text-cream border-forest'
+                        : 'bg-white text-stone-600 border-stone-200 hover:border-forest/50'
+                    }`}
+                  >
+                    ${b}
+                  </button>
+                ))}
+              </div>
+
+              {/* Input manual */}
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
+                <input
+                  className="input pl-6 text-sm py-2"
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  placeholder={String(Math.ceil(total))}
+                  value={montoRecibido}
+                  onChange={(e) => setMontoRecibido(e.target.value)}
+                />
+              </div>
+
+              {cambio !== null && (
+                <div className={`mt-1.5 flex justify-between text-sm font-semibold px-1 ${cambio >= 0 ? 'text-forest' : 'text-red-500'}`}>
+                  <span>{cambio >= 0 ? 'Cambio' : 'Falta'}</span>
+                  <span>{fmt(Math.abs(cambio))}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Descuento ticket */}
+          {descuentosTicket.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-stone-500 mb-1">Descuento en ticket</p>
+              <select
+                className="input text-xs py-1.5"
+                value={descuentoTicket?.id ?? ''}
+                onChange={(e) => {
+                  const id = Number(e.target.value)
+                  setDescuentoTicket(id ? descuentosTicket.find((d) => d.id === id) ?? null : null)
+                }}
+              >
+                <option value="">Sin descuento</option>
+                {descuentosTicket.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nombre} ({fmtDescuento(d)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Propina */}
+          {cart.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-stone-500 mb-1.5">Propina (opcional)</p>
+              <div className="flex gap-1.5">
+                {[10, 15, 20].map((pct) => {
+                  const monto = Math.round(total * pct / 100)
+                  const activo = !propinaCustom && propina === String(monto)
+                  return (
+                    <button
+                      key={pct}
+                      onClick={() => { setPropinaCustom(false); setPropina(activo ? '' : String(monto)) }}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                        activo
+                          ? 'bg-forest text-cream border-forest'
+                          : 'bg-white text-stone-600 border-stone-200 hover:border-forest/50'
+                      }`}
+                    >
+                      {pct}%<br />
+                      <span className="text-xs opacity-75">{fmt(monto)}</span>
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => { setPropinaCustom(true); setPropina('') }}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                    propinaCustom
+                      ? 'bg-forest text-cream border-forest'
+                      : 'bg-white text-stone-600 border-stone-200 hover:border-forest/50'
+                  }`}
+                >
+                  Otra
+                </button>
+              </div>
+              {propinaCustom && (
+                <div className="relative mt-2">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
+                  <input
+                    className="input pl-6 text-sm py-2"
+                    type="number"
+                    min={0}
+                    step="1"
+                    placeholder="0.00"
+                    value={propina}
+                    onChange={(e) => setPropina(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Desglose */}
+          {(totalDescuentosItems > 0 || descuentoTicketMonto > 0 || propinaNum > 0) && (
+            <div className="space-y-1 text-xs text-stone-500">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{fmt(subtotalItems)}</span>
+              </div>
+              {totalDescuentosItems > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Descuentos en ítems</span>
+                  <span>−{fmt(totalDescuentosItems)}</span>
+                </div>
+              )}
+              {descuentoTicketMonto > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>{descuentoTicket!.nombre}</span>
+                  <span>−{fmt(descuentoTicketMonto)}</span>
+                </div>
+              )}
+              {propinaNum > 0 && (
+                <div className="flex justify-between text-amber-600">
+                  <span>Propina</span>
+                  <span>+{fmt(propinaNum)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-baseline justify-between">
-            <span className="text-sm text-stone-500">Total</span>
-            <span className="text-2xl font-bold text-stone-900">{fmt(total)}</span>
+            <span className="text-sm text-stone-500">{propinaNum > 0 ? 'Total c/propina' : 'Total'}</span>
+            <span className="text-2xl font-bold text-stone-900">{fmt(totalConPropina)}</span>
           </div>
 
           {error && (
@@ -290,17 +657,134 @@ export default function POSPage() {
             className="btn-primary w-full py-3 text-base flex items-center justify-center gap-2"
           >
             {submitting && <Spinner className="w-4 h-4 text-cream" />}
-            {submitting ? 'Procesando…' : `Cobrar ${cart.length > 0 ? fmt(total) : ''}`}
+            {submitting ? 'Procesando…' : `Cobrar ${cart.length > 0 ? fmt(totalConPropina) : ''}`}
           </button>
         </div>
       </aside>
 
-      {/* ── Recibo modal ── */}
+      {/* ── Modal modificadores + descuento ── */}
+      {modModal && (
+        <Modal title={modModal.producto.nombre} onClose={() => setModModal(null)} size="sm">
+          <div className="space-y-5">
+            <p className="text-xs text-stone-400 -mt-2">Selecciona las opciones para este producto</p>
+
+            {modError && (
+              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{modError}</p>
+            )}
+
+            {modModal.grupos.map((grupo) => {
+              const selected = modModal.seleccion[grupo.id] ?? []
+              const esRadio = grupo.seleccionMax === 1
+              return (
+                <div key={grupo.id}>
+                  <div className="flex items-baseline justify-between mb-2">
+                    <p className="text-sm font-semibold text-stone-800">{grupo.nombre}</p>
+                    <span className="text-xs text-stone-400">
+                      {grupo.seleccionMin > 0 ? `Requerido · mín. ${grupo.seleccionMin}` : 'Opcional'}
+                      {grupo.seleccionMax && grupo.seleccionMax > 1 ? ` · máx. ${grupo.seleccionMax}` : ''}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {(grupo.opciones ?? []).filter((o) => o.activo).map((opcion) => {
+                      const isSelected = selected.includes(opcion.id)
+                      const atMax = !esRadio && grupo.seleccionMax !== null && selected.length >= grupo.seleccionMax && !isSelected
+                      return (
+                        <button
+                          key={opcion.id}
+                          type="button"
+                          disabled={atMax}
+                          onClick={() => toggleOpcion(grupo.id, opcion.id, grupo.seleccionMax)}
+                          className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                            isSelected
+                              ? 'bg-forest/10 border-forest text-forest'
+                              : atMax
+                              ? 'bg-stone-50 border-stone-100 text-stone-300 cursor-not-allowed'
+                              : 'bg-white border-stone-200 text-stone-700 hover:border-forest/40 hover:bg-surface-muted'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? 'border-forest bg-forest' : 'border-stone-300'}`}>
+                              {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </span>
+                            <span>{opcion.nombre}</span>
+                          </div>
+                          {opcion.precioExtra > 0 && (
+                            <span className="text-xs font-semibold text-forest">+{fmt(opcion.precioExtra)}</span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Descuento aplicable */}
+            {modModal.descuentoAplicable && (
+              <div className="border-t border-stone-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setModModal((p) => p ? { ...p, descuentoActivo: !p.descuentoActivo } : p)}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                    modModal.descuentoActivo
+                      ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
+                      : 'bg-white border-stone-200 text-stone-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${modModal.descuentoActivo ? 'border-emerald-500 bg-emerald-500' : 'border-stone-300'}`}>
+                      {modModal.descuentoActivo && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="font-medium">{modModal.descuentoAplicable.nombre}</span>
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-600">
+                    −{fmtDescuento(modModal.descuentoAplicable)}
+                  </span>
+                </button>
+                <p className="text-xs text-stone-400 mt-1 pl-1">Descuento aplicable — desmarca para no aplicar</p>
+              </div>
+            )}
+
+            {/* Cantidad */}
+            <div className="flex items-center justify-between border-t border-stone-100 pt-4">
+              <span className="text-sm font-medium text-stone-700">Cantidad</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setModModal((p) => p ? { ...p, cantidad: Math.max(1, p.cantidad - 1) } : p)}
+                  className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center text-lg leading-none"
+                >
+                  −
+                </button>
+                <span className="text-lg font-semibold text-stone-800 w-6 text-center">{modModal.cantidad}</span>
+                <button
+                  onClick={() => setModModal((p) => p ? { ...p, cantidad: p.cantidad + 1 } : p)}
+                  className="w-8 h-8 rounded-lg bg-forest text-cream hover:bg-forest-dark flex items-center justify-center text-lg leading-none"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setModModal(null)} className="btn-secondary flex-1">Cancelar</button>
+              <button onClick={confirmarMods} className="btn-primary flex-1">
+                {modModal.cantidad > 1 ? `Agregar ${modModal.cantidad} al pedido` : 'Agregar al pedido'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Recibo ── */}
       {ventaExitosa && (
         <Modal title="Venta registrada" onClose={() => setVentaExitosa(null)} size="sm">
           <div className="space-y-4">
             <div className="flex items-center gap-3 bg-green-50 rounded-xl p-4">
-              <span className="text-3xl">✓</span>
+              <span className="text-2xl">✓</span>
               <div>
                 <p className="font-semibold text-green-800">Venta #{ventaExitosa.id}</p>
                 <p className="text-sm text-green-600">{ventaExitosa.metodoPago}</p>
@@ -309,24 +793,41 @@ export default function POSPage() {
 
             <div className="space-y-2">
               {ventaExitosa.items.map((item, i) => (
-                <div key={i} className="flex justify-between text-sm">
-                  <span className="text-stone-600">
-                    {item.cantidad}× {item.nombreProducto}
-                  </span>
-                  <span className="font-medium">{fmt(item.precioUnitario * item.cantidad)}</span>
+                <div key={i}>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-stone-600">{item.cantidad}× {item.nombreProducto}</span>
+                    <span className="font-medium">{fmt(item.precioUnitario * item.cantidad)}</span>
+                  </div>
+                  {(item.modificadores ?? []).length > 0 && (
+                    <div className="pl-4">
+                      {item.modificadores.map((m, j) => (
+                        <p key={j} className="text-xs text-stone-400">+ {m.nombre}</p>
+                      ))}
+                    </div>
+                  )}
+                  {item.descuentoNombre && item.descuentoMonto != null && (
+                    <div className="flex justify-between pl-4 text-xs text-emerald-600">
+                      <span>− {item.descuentoNombre}</span>
+                      <span>−{fmt(item.descuentoMonto)}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+
+            {ventaExitosa.descuentoTicketNombre && ventaExitosa.descuentoTicketMonto != null && (
+              <div className="flex justify-between text-sm text-emerald-600">
+                <span>− {ventaExitosa.descuentoTicketNombre}</span>
+                <span>−{fmt(ventaExitosa.descuentoTicketMonto)}</span>
+              </div>
+            )}
 
             <div className="border-t border-stone-100 pt-3 flex justify-between font-semibold">
               <span>Total</span>
               <span className="text-forest text-lg">{fmt(ventaExitosa.total)}</span>
             </div>
 
-            <button
-              onClick={() => setVentaExitosa(null)}
-              className="btn-primary w-full py-2.5"
-            >
+            <button onClick={() => setVentaExitosa(null)} className="btn-primary w-full py-2.5">
               Nueva venta
             </button>
           </div>
