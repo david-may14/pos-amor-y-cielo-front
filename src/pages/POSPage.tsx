@@ -502,7 +502,10 @@ export default function POSPage() {
               </button>
             )}
             {ticketActivo && (
-              <button onClick={salirEdicionTicket} className="text-xs text-stone-400 hover:text-stone-700 transition-colors">
+              <button
+                onClick={salirEdicionTicket}
+                className="text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1 rounded-lg transition-colors"
+              >
                 Salir
               </button>
             )}
