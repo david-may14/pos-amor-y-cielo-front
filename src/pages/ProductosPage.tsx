@@ -10,11 +10,14 @@ import {
   asignarModificador,
   quitarModificador,
   toggleDisponibilidad,
+  listarPlantillasProducto,
+  asignarPlantillasProducto,
 } from '../api/productos'
 import { listarModificadores } from '../api/modificadores'
 import { listarCategorias } from '../api/categorias'
 import { listarIngredientes } from '../api/ingredientes'
-import type { ProductoDTO, Categoria, RecetaLineaDTO, Ingrediente, ModificadorGrupo } from '../types/api'
+import { listarPlantillas } from '../api/plantillas'
+import type { ProductoDTO, Categoria, RecetaLineaDTO, Ingrediente, ModificadorGrupo, PlantillaDTO } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 
@@ -59,6 +62,13 @@ export default function ProductosPage() {
   const [gruposAsignados, setGruposAsignados] = useState<Set<number>>(new Set())
   const [modifLoading, setModifLoading] = useState(false)
   const [toggling, setToggling] = useState<number | null>(null)
+
+  const [plantillasProducto, setPlantillasProducto] = useState<ProductoDTO | null>(null)
+  const [todasPlantillas, setTodasPlantillas] = useState<PlantillaDTO[]>([])
+  const [plantillasSeleccionadas, setPlantillasSeleccionadas] = useState<Set<number>>(new Set())
+  const [plantillasLoading, setPlantillasLoading] = useState(false)
+  const [plantillasSaving, setPlantillasSaving] = useState(false)
+  const [plantillasError, setPlantillasError] = useState('')
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -201,6 +211,35 @@ export default function ProductosPage() {
     }
   }
 
+  const openPlantillas = async (p: ProductoDTO) => {
+    setPlantillasProducto(p)
+    setPlantillasLoading(true)
+    setPlantillasError('')
+    try {
+      const [todas, actuales] = await Promise.all([listarPlantillas(), listarPlantillasProducto(p.id)])
+      setTodasPlantillas(todas)
+      setPlantillasSeleccionadas(new Set(actuales.map((pl) => pl.id)))
+    } catch (e: unknown) {
+      setPlantillasError(e instanceof Error ? e.message : 'Error al cargar')
+    } finally {
+      setPlantillasLoading(false)
+    }
+  }
+
+  const handleGuardarPlantillas = async () => {
+    if (!plantillasProducto) return
+    setPlantillasSaving(true)
+    setPlantillasError('')
+    try {
+      await asignarPlantillasProducto(plantillasProducto.id, [...plantillasSeleccionadas])
+      setPlantillasProducto(null)
+    } catch (e: unknown) {
+      setPlantillasError(e instanceof Error ? e.message : 'Error al guardar')
+    } finally {
+      setPlantillasSaving(false)
+    }
+  }
+
   const handleToggleGrupo = async (grupoId: number, asignado: boolean) => {
     if (!modifProducto || toggling === grupoId) return
     setToggling(grupoId)
@@ -339,6 +378,9 @@ export default function ProductosPage() {
                     <button onClick={() => openReceta(p)} className="text-xs text-stone-400 hover:text-forest transition-colors">
                       Receta
                     </button>
+                    <button onClick={() => openPlantillas(p)} className="text-xs text-stone-400 hover:text-forest transition-colors">
+                      Plantillas
+                    </button>
                     <button onClick={() => openModificadores(p)} className="text-xs text-stone-400 hover:text-forest transition-colors">
                       Modificadores
                     </button>
@@ -458,6 +500,74 @@ export default function ProductosPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* Plantillas modal */}
+      {plantillasProducto && (
+        <Modal
+          title={`Plantillas — ${plantillasProducto.nombre}`}
+          onClose={() => setPlantillasProducto(null)}
+          size="md"
+        >
+          {plantillasLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner className="w-6 h-6 text-forest" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {plantillasError && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{plantillasError}</p>
+              )}
+              {todasPlantillas.length === 0 ? (
+                <p className="text-sm text-stone-400 text-center py-8">
+                  No hay plantillas. Créalas en la sección <strong>Plantillas</strong>.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {todasPlantillas.map((pl) => {
+                    const seleccionada = plantillasSeleccionadas.has(pl.id)
+                    return (
+                      <div key={pl.id} className="flex items-center justify-between bg-surface-muted rounded-xl px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-stone-800">{pl.nombre}</p>
+                          <p className="text-xs text-stone-400">
+                            {pl.ingredientes.length === 0
+                              ? 'Sin ingredientes'
+                              : pl.ingredientes.map((i) => `${i.ingredienteNombre}`).join(', ')}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setPlantillasSeleccionadas((prev) => {
+                              const next = new Set(prev)
+                              if (seleccionada) next.delete(pl.id)
+                              else next.add(pl.id)
+                              return next
+                            })
+                          }}
+                          className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${seleccionada ? 'bg-forest' : 'bg-stone-200'}`}
+                        >
+                          <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${seleccionada ? 'left-5' : 'left-0.5'}`} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setPlantillasProducto(null)} className="btn-secondary flex-1">Cancelar</button>
+                <button
+                  onClick={handleGuardarPlantillas}
+                  disabled={plantillasSaving || todasPlantillas.length === 0}
+                  className="btn-primary flex-1 flex justify-center gap-2"
+                >
+                  {plantillasSaving && <Spinner className="w-4 h-4 text-cream" />}
+                  Guardar
+                </button>
+              </div>
             </div>
           )}
         </Modal>

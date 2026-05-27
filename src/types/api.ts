@@ -274,6 +274,21 @@ export interface ResumenDia {
   ventasPorMetodoPago: Record<string, number>
 }
 
+// ─── Plantillas de receta ─────────────────────────────────────────────────────
+export interface IngredienteLineaPlantillaDTO {
+  id: number
+  ingredienteId: number
+  ingredienteNombre: string
+  unidad: string
+  cantidad: number
+}
+export interface PlantillaDTO {
+  id: number
+  nombre: string
+  activo: boolean
+  ingredientes: IngredienteLineaPlantillaDTO[]
+}
+
 // ─── Tickets abiertos (comandas) ──────────────────────────────────────────────
 export interface TicketModificadorRequest {
   opcionId: number

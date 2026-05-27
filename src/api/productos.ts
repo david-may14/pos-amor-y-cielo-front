@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, ModificadorGrupo } from '../types/api'
+import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, ModificadorGrupo, PlantillaDTO } from '../types/api'
 
 export const listarProductos = () => api.get<ProductoDTO[]>('/api/productos')
 
@@ -29,3 +29,9 @@ export const quitarModificador = (productoId: number, grupoId: number) =>
 
 export const toggleDisponibilidad = (id: number) =>
   api.patch<ProductoDTO>(`/api/productos/${id}/disponibilidad`, {})
+
+export const listarPlantillasProducto = (id: number) =>
+  api.get<PlantillaDTO[]>(`/api/productos/${id}/plantillas`)
+
+export const asignarPlantillasProducto = (id: number, plantillaIds: number[]) =>
+  api.put<PlantillaDTO[]>(`/api/productos/${id}/plantillas`, plantillaIds)
