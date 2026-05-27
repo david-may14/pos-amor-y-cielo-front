@@ -16,6 +16,7 @@ import CajaPage from './pages/CajaPage'
 import ConfiguracionPage from './pages/ConfiguracionPage'
 import TicketsPage from './pages/TicketsPage'
 import PlantillasPage from './pages/PlantillasPage'
+import InsumosPage from './pages/InsumosPage'
 
 function RequireAuth() {
   const { user } = useAuth()
@@ -43,13 +44,14 @@ export default function App() {
           <Route element={<RequireAdmin />}>
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/productos" element={<ProductosPage />} />
-            <Route path="/ingredientes" element={<IngredientesPage />} />
+            <Route path="/insumos" element={<InsumosPage />} />
+            <Route path="/ingredientes" element={<Navigate to="/insumos" replace />} />
+            <Route path="/plantillas" element={<Navigate to="/insumos" replace />} />
             <Route path="/inventario" element={<InventarioPage />} />
             <Route path="/usuarios" element={<UsuariosPage />} />
             <Route path="/modificadores" element={<ModificadoresPage />} />
             <Route path="/categorias" element={<CategoriasPage />} />
             <Route path="/descuentos" element={<DescuentosPage />} />
-            <Route path="/plantillas" element={<PlantillasPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
           </Route>
         </Route>
