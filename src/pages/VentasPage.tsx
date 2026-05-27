@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { listarVentas, resumenDia, anularVenta } from '../api/ventas'
 import type { VentaResponse, ResumenDia } from '../types/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,6 +9,11 @@ const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
 const hoy = () => new Date().toISOString().split('T')[0]
+
+type DisplayItem =
+  | { kind: 'solo'; venta: VentaResponse }
+  | { kind: 'group-header'; grupo: string; miembros: VentaResponse[] }
+  | { kind: 'sub'; venta: VentaResponse; idx: number; count: number }
 
 export default function VentasPage() {
   const { isAdmin } = useAuth()
@@ -35,6 +40,30 @@ export default function VentasPage() {
   }, [fecha])
 
   useEffect(() => { cargar() }, [cargar])
+
+  const displayItems = useMemo<DisplayItem[]>(() => {
+    const byGrupo = new Map<string, VentaResponse[]>()
+    ventas.forEach(v => {
+      if (v.splitGrupo) {
+        const arr = byGrupo.get(v.splitGrupo) ?? []
+        arr.push(v)
+        byGrupo.set(v.splitGrupo, arr)
+      }
+    })
+    const seen = new Set<string>()
+    const items: DisplayItem[] = []
+    ventas.forEach(v => {
+      if (!v.splitGrupo) {
+        items.push({ kind: 'solo', venta: v })
+      } else if (!seen.has(v.splitGrupo)) {
+        seen.add(v.splitGrupo)
+        const miembros = byGrupo.get(v.splitGrupo)!
+        items.push({ kind: 'group-header', grupo: v.splitGrupo, miembros })
+        miembros.forEach((m, i) => items.push({ kind: 'sub', venta: m, idx: i + 1, count: miembros.length }))
+      }
+    })
+    return items
+  }, [ventas])
 
   const handleAnular = async (v: VentaResponse) => {
     if (!confirm(`¿Anular la venta #${v.id} por ${fmt(v.total)}? Se restaurará el inventario.`)) return
@@ -132,22 +161,36 @@ export default function VentasPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-50">
-                  {ventas.map((v) => {
+                  {displayItems.map((row) => {
+                    if (row.kind === 'group-header') {
+                      const totalGrupo = row.miembros.reduce((s, m) => s + m.total, 0)
+                      const hora = new Date(row.miembros[0].creadaEn).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+                      return (
+                        <tr key={`gh-${row.grupo}`} className="bg-amber-50/70 border-b-0">
+                          <td colSpan={6} className="px-5 py-2">
+                            <div className="flex items-center gap-3 text-xs">
+                              <span className="font-semibold text-amber-700">Ticket dividido</span>
+                              <span className="bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-medium">{row.miembros.length} cuentas</span>
+                              <span className="text-stone-400">{hora}</span>
+                              <span className="ml-auto font-semibold text-stone-600">{fmt(totalGrupo)} total</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }
+                    const v = row.venta
                     const anulada = v.estado === 'ANULADA'
-                    const splitCount = v.splitGrupo
-                      ? ventas.filter(x => x.splitGrupo === v.splitGrupo).length
-                      : 0
+                    const isSub = row.kind === 'sub'
                     return (
-                      <tr key={v.id} className={`transition-colors ${anulada ? 'bg-red-50/50 opacity-60' : v.splitGrupo ? 'hover:bg-amber-50/30' : 'hover:bg-surface-muted/50'}`}>
-                        <td className="px-5 py-3 font-medium text-stone-700">
+                      <tr key={v.id} className={`transition-colors ${anulada ? 'bg-red-50/50 opacity-60' : isSub ? 'bg-amber-50/20 hover:bg-amber-50/40' : 'hover:bg-surface-muted/50'}`}>
+                        <td className="py-3 font-medium text-stone-700" style={{ paddingLeft: isSub ? '2rem' : '1.25rem', paddingRight: '1.25rem' }}>
+                          {isSub && <span className="text-amber-300 mr-1 text-xs">└</span>}
                           #{v.id}
+                          {isSub && (
+                            <span className="ml-1.5 text-xs text-amber-500 font-normal">{row.idx}/{row.count}</span>
+                          )}
                           {anulada && (
                             <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">anulada</span>
-                          )}
-                          {v.splitGrupo && (
-                            <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                              split {splitCount > 1 ? `×${splitCount}` : ''}
-                            </span>
                           )}
                         </td>
                         <td className="px-5 py-3 text-stone-500">
