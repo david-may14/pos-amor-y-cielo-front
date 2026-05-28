@@ -12,14 +12,16 @@ import {
   toggleDisponibilidad,
   listarPlantillasProducto,
   asignarPlantillasProducto,
+  exportarProductos,
 } from '../api/productos'
 import { listarModificadores } from '../api/modificadores'
 import { listarCategorias } from '../api/categorias'
 import { listarIngredientes } from '../api/ingredientes'
 import { listarPlantillas } from '../api/plantillas'
-import type { ProductoDTO, Categoria, RecetaLineaDTO, Ingrediente, ModificadorGrupo, PlantillaDTO } from '../types/api'
+import type { ProductoDTO, Categoria, RecetaLineaDTO, Ingrediente, ModificadorGrupo, PlantillaDTO, ImportResult } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
+import ImportarProductosModal from '../components/ImportarProductosModal'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
@@ -27,10 +29,11 @@ const fmt = (n: number) =>
 interface ProductoForm {
   nombre: string
   precioVenta: string
+  costo: string
   categoriaId: string
 }
 
-const emptyForm: ProductoForm = { nombre: '', precioVenta: '', categoriaId: '' }
+const emptyForm: ProductoForm = { nombre: '', precioVenta: '', costo: '', categoriaId: '' }
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState<ProductoDTO[]>([])
@@ -62,6 +65,9 @@ export default function ProductosPage() {
   const [gruposAsignados, setGruposAsignados] = useState<Set<number>>(new Set())
   const [modifLoading, setModifLoading] = useState(false)
   const [toggling, setToggling] = useState<number | null>(null)
+
+  const [showImport, setShowImport] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
 
   const [plantillasProducto, setPlantillasProducto] = useState<ProductoDTO | null>(null)
   const [todasPlantillas, setTodasPlantillas] = useState<PlantillaDTO[]>([])
@@ -95,7 +101,7 @@ export default function ProductosPage() {
   const openEdit = (p: ProductoDTO) => {
     setEditing(p)
     const cat = categorias.find((c) => c.nombre === p.categoria)
-    setForm({ nombre: p.nombre, precioVenta: String(p.precioVenta), categoriaId: cat ? String(cat.id) : '' })
+    setForm({ nombre: p.nombre, precioVenta: String(p.precioVenta), costo: String(p.costo ?? 0), categoriaId: cat ? String(cat.id) : '' })
     setFormError('')
     setShowForm(true)
   }
@@ -108,6 +114,7 @@ export default function ProductosPage() {
       const data = {
         nombre: form.nombre,
         precioVenta: parseFloat(form.precioVenta),
+        costo: parseFloat(form.costo) || 0,
         ...(form.categoriaId ? { categoriaId: parseInt(form.categoriaId) } : {}),
       }
       if (editing) {
@@ -289,10 +296,42 @@ export default function ProductosPage() {
     <div className="flex-1 overflow-y-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-stone-800">Productos</h1>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
-          <span className="text-lg leading-none">+</span> Nuevo producto
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportarProductos().catch((e) => setError(e.message))}
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Exportar CSV
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+            </svg>
+            Importar CSV
+          </button>
+          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+            <span className="text-lg leading-none">+</span> Nuevo producto
+          </button>
+        </div>
       </div>
+
+      {importResult && (
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-5 py-3 mb-5 flex items-center justify-between">
+          <p className="text-sm text-emerald-800">
+            Importación completada — <strong>{importResult.creados}</strong> creados,{' '}
+            <strong>{importResult.actualizados}</strong> actualizados,{' '}
+            <strong>{importResult.eliminados}</strong> desactivados,{' '}
+            <strong>{importResult.categoriasNuevas}</strong> categorías nuevas
+          </p>
+          <button onClick={() => setImportResult(null)} className="text-emerald-600 hover:text-emerald-800 text-lg leading-none ml-4">×</button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-5">{error}</div>
@@ -345,13 +384,14 @@ export default function ProductosPage() {
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Nombre</th>
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Categoría</th>
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Precio</th>
+              <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Costo</th>
               <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-50">
             {productosFiltrados.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-5 py-12 text-center text-stone-400">
+                <td colSpan={5} className="px-5 py-12 text-center text-stone-400">
                   {busqueda ? `Sin resultados para "${busqueda}"` : 'Sin productos en esta categoría'}
                 </td>
               </tr>
@@ -366,6 +406,7 @@ export default function ProductosPage() {
                 </td>
                 <td className="px-5 py-3 text-stone-500">{p.categoria || '—'}</td>
                 <td className="px-5 py-3 text-right font-semibold text-forest">{fmt(p.precioVenta)}</td>
+                <td className="px-5 py-3 text-right text-stone-500 text-xs">{p.costo > 0 ? fmt(p.costo) : '—'}</td>
                 <td className="px-5 py-3 text-right">
                   <div className="flex items-center justify-end gap-3">
                     <button
@@ -415,17 +456,32 @@ export default function ProductosPage() {
                 autoFocus
               />
             </div>
-            <div>
-              <label className="label">Precio de venta (MXN)</label>
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.5"
-                value={form.precioVenta}
-                onChange={(e) => setForm({ ...form, precioVenta: e.target.value })}
-                placeholder="85.00"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Precio de venta (MXN)</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={form.precioVenta}
+                  onChange={(e) => setForm({ ...form, precioVenta: e.target.value })}
+                  placeholder="85.00"
+                />
+              </div>
+              <div>
+                <label className="label">Costo manual (MXN)</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.costo}
+                  onChange={(e) => setForm({ ...form, costo: e.target.value })}
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-stone-400 mt-1">La receta tiene prioridad si existe</p>
+              </div>
             </div>
             <div>
               <label className="label">Categoría (opcional)</label>
@@ -571,6 +627,18 @@ export default function ProductosPage() {
             </div>
           )}
         </Modal>
+      )}
+
+      {/* Import modal */}
+      {showImport && (
+        <ImportarProductosModal
+          onClose={() => setShowImport(false)}
+          onSuccess={(result) => {
+            setShowImport(false)
+            setImportResult(result)
+            cargar()
+          }}
+        />
       )}
 
       {/* Receta modal */}

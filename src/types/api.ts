@@ -53,15 +53,38 @@ export interface CategoriaRequest {
 // ─── Productos ────────────────────────────────────────────────────────────────
 export interface ProductoDTO {
   id: number
+  handle: string
   nombre: string
   precioVenta: number
+  costo: number
   categoria: string
   disponible: boolean
 }
 export interface ProductoRequest {
   nombre: string
   precioVenta: number
+  costo?: number
   categoriaId?: number
+}
+
+// ─── Import/Export ────────────────────────────────────────────────────────────
+export interface ImportCambio { campo: string; antes: string; despues: string }
+export interface ImportFilaCrear { handle: string; nombre: string; categoria: string; precio: number; costo: number; disponible: boolean }
+export interface ImportFilaActualizar { handle: string; nombre: string; cambios: ImportCambio[] }
+export interface ImportFilaEliminar { handle: string; nombre: string }
+export interface ImportFilaError { fila: number; mensaje: string }
+export interface ImportPreviewResult {
+  aCrear: ImportFilaCrear[]
+  aActualizar: ImportFilaActualizar[]
+  aEliminar: ImportFilaEliminar[]
+  categoriasNuevas: string[]
+  errores: ImportFilaError[]
+}
+export interface ImportResult {
+  creados: number
+  actualizados: number
+  eliminados: number
+  categoriasNuevas: number
 }
 
 // ─── Receta ───────────────────────────────────────────────────────────────────
