@@ -109,6 +109,11 @@ export interface Ingrediente {
   stockMinimo: number
   costoUnitario: number
   rendimientoLote: number | null
+  marca?: string | null
+  proveedor?: string | null
+  grupo?: string | null
+  presentacion?: string | null
+  formatoCompra?: number | null
   actualizadoEn: string
 }
 export interface IngredienteRequest {
@@ -118,6 +123,32 @@ export interface IngredienteRequest {
   costoUnitario: number
   stockInicial?: number
 }
+export interface IngredientePrecioDTO {
+  id: number
+  proveedor: string | null
+  precioTotal: number
+  cantidad: number
+  precioUnitario: number
+  fecha: string
+  activo: boolean
+}
+export interface AgregarPrecioRequest {
+  proveedor?: string
+  precioTotal: number
+  cantidad: number
+}
+
+// ─── Import Ingredientes ──────────────────────────────────────────────────────
+export interface IngPrecioRow { proveedor: string | null; precioTotal: number; cantidad: number; precioUnitario: number }
+export interface IngCambioMeta { campo: string; antes: string | null; despues: string }
+export interface IngFilaCrear { nombre: string; unidad: string; marca: string | null; proveedor: string | null; grupo: string | null; costoUnitario: number; precios: IngPrecioRow[] }
+export interface IngFilaActualizar { nombre: string; cambiosMeta: IngCambioMeta[]; preciosNuevos: IngPrecioRow[] }
+export interface IngPreviewResult {
+  aCrear: IngFilaCrear[]
+  aActualizar: IngFilaActualizar[]
+  errores: { fila: number; mensaje: string }[]
+}
+export interface IngImportResult { creados: number; actualizados: number; preciosAgregados: number }
 
 // ─── Sub-recetas ──────────────────────────────────────────────────────────────
 export interface SubrecetaLineaDTO {

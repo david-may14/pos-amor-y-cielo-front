@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { listarIngredientes, crearIngrediente, actualizarIngrediente, obtenerSubreceta, guardarSubreceta, eliminarSubreceta } from '../api/ingredientes'
 import { registrarAjuste } from '../api/inventario'
-import type { Ingrediente, SubrecetaDTO } from '../types/api'
+import type { Ingrediente, SubrecetaDTO, IngImportResult } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
+import ImportarIngredientesModal from '../components/ImportarIngredientesModal'
+import PreciosIngredienteModal from '../components/PreciosIngredienteModal'
 
 const UNIDADES = [
   { value: 'g',     label: 'g — gramos' },
@@ -50,6 +52,10 @@ export default function IngredientesPage() {
   const [form, setForm] = useState<IngredienteForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  const [showImport, setShowImport] = useState(false)
+  const [importResult, setImportResult] = useState<IngImportResult | null>(null)
+  const [preciosIng, setPreciosIng] = useState<Ingrediente | null>(null)
 
   // Sub-receta
   const [showSubreceta, setShowSubreceta] = useState(false)
@@ -246,6 +252,12 @@ export default function IngredientesPage() {
           <p className="text-sm text-stone-400 mt-0.5">Usa la misma unidad en todo: ingrediente, receta e inventario</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setShowImport(true)} className="btn-secondary flex items-center gap-1.5 text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+            </svg>
+            Importar CSV
+          </button>
           <button onClick={openNuevaSubreceta} className="btn-secondary flex items-center gap-2">
             <span className="text-lg leading-none">+</span> Nueva sub-receta
           </button>
@@ -254,6 +266,17 @@ export default function IngredientesPage() {
           </button>
         </div>
       </div>
+
+      {importResult && (
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-5 py-3 mb-5 flex items-center justify-between">
+          <p className="text-sm text-emerald-800">
+            Importación completada — <strong>{importResult.creados}</strong> creados,{' '}
+            <strong>{importResult.actualizados}</strong> actualizados,{' '}
+            <strong>{importResult.preciosAgregados}</strong> precios registrados
+          </p>
+          <button onClick={() => setImportResult(null)} className="text-emerald-600 hover:text-emerald-800 text-lg leading-none ml-4">×</button>
+        </div>
+      )}
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-5">{error}</div>}
 
@@ -298,6 +321,7 @@ export default function IngredientesPage() {
             <tr className="border-b border-stone-100 text-left">
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Nombre</th>
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Unidad</th>
+              <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Proveedor</th>
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Stock actual</th>
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Stock mín.</th>
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Costo unitario</th>
@@ -307,14 +331,14 @@ export default function IngredientesPage() {
           <tbody className="divide-y divide-stone-50">
             {ingredientes.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-stone-400">
+                <td colSpan={7} className="px-5 py-12 text-center text-stone-400">
                   Sin ingredientes registrados
                 </td>
               </tr>
             )}
             {ingredientes.length > 0 && ingredientesFiltrados.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-stone-400">
+                <td colSpan={7} className="px-5 py-12 text-center text-stone-400">
                   Sin resultados para "{busqueda}"
                 </td>
               </tr>
@@ -327,8 +351,10 @@ export default function IngredientesPage() {
                     {ing.nombre}
                     {bajo && <span className="ml-2 text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">bajo</span>}
                     {ing.rendimientoLote != null && <span className="ml-2 text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">elaborado</span>}
+                    {ing.marca && <span className="ml-1 text-xs text-stone-400">{ing.marca}</span>}
                   </td>
                   <td className="px-5 py-3 text-stone-500">{unidadLabel(ing.unidad)}</td>
+                  <td className="px-5 py-3 text-stone-400 text-xs">{ing.proveedor || '—'}</td>
                   <td className={`px-5 py-3 text-right font-semibold ${bajo ? 'text-amber-600' : 'text-stone-700'}`}>
                     {ing.stockActual} {ing.unidad}
                   </td>
@@ -336,6 +362,7 @@ export default function IngredientesPage() {
                   <td className="px-5 py-3 text-right text-stone-500">{fmt(ing.costoUnitario)}/{ing.unidad}</td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
+                      <button onClick={() => setPreciosIng(ing)} className="text-xs text-forest hover:underline">Precios</button>
                       {ing.rendimientoLote != null && (
                         <button onClick={() => openSubreceta(ing)} className="text-xs text-blue-600 hover:underline">Sub-receta</button>
                       )}
@@ -605,6 +632,25 @@ export default function IngredientesPage() {
             </div>
           )}
         </Modal>
+      )}
+
+      {showImport && (
+        <ImportarIngredientesModal
+          onClose={() => setShowImport(false)}
+          onSuccess={(result) => {
+            setShowImport(false)
+            setImportResult(result)
+            cargar()
+          }}
+        />
+      )}
+
+      {preciosIng && (
+        <PreciosIngredienteModal
+          ingrediente={preciosIng}
+          onClose={() => setPreciosIng(null)}
+          onUpdated={() => cargar()}
+        />
       )}
     </div>
   )
