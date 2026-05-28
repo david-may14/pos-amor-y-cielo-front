@@ -289,6 +289,23 @@ export interface PlantillaDTO {
   ingredientes: IngredienteLineaPlantillaDTO[]
 }
 
+// ─── Punto de equilibrio ─────────────────────────────────────────────────────
+export interface GastoFijoDTO {
+  id: number
+  nombre: string
+  monto: number
+  activo: boolean
+}
+export interface EquilibrioDTO {
+  totalGastosFijos: number
+  ingresosDelMes: number
+  costoDelMes: number
+  margenBruto: number       // 0-100
+  metaVentas: number        // ventas necesarias para cubrir gastos fijos
+  faltante: number
+  porcentaje: number
+}
+
 // ─── Tickets abiertos (comandas) ──────────────────────────────────────────────
 export interface TicketModificadorRequest {
   opcionId: number

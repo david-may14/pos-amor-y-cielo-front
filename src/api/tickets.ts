@@ -20,3 +20,6 @@ export const cobrarTicket = (id: number, req: CobrarTicketRequest) =>
 
 export const cancelarTicket = (id: number) =>
   api.delete<TicketResponse>(`/api/tickets/${id}`)
+
+export const historialTickets = (desde: string, hasta: string) =>
+  api.get<TicketResponse[]>(`/api/tickets/historial?desde=${desde}&hasta=${hasta}`)

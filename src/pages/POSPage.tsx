@@ -5,9 +5,11 @@ import { listarCategorias } from '../api/categorias'
 import { crearVenta } from '../api/ventas'
 import { getDescuentoAplicable, listarDescuentos, listarDescuentosTicket } from '../api/descuentos'
 import { detalleTicket, crearTicket, actualizarTicket, cobrarTicket } from '../api/tickets'
+import { obtenerEquilibrio } from '../api/equilibrio'
+import { useAuth } from '../contexts/AuthContext'
 import type {
   ProductoDTO, Categoria, VentaResponse, MetodoPago, ModificadorGrupo, DescuentoView,
-  TicketResponse, TicketItemRequest,
+  TicketResponse, TicketItemRequest, EquilibrioDTO,
 } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
@@ -73,11 +75,13 @@ const fmtDescuento = (d: DescuentoView | CartDiscount) =>
 export default function POSPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const [productos, setProductos] = useState<ProductoDTO[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedCategoria, setSelectedCategoria] = useState<string>('Todos')
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO')
+  const [equilibrio, setEquilibrio] = useState<EquilibrioDTO | null>(null)
   const [propina, setPropina] = useState('')
   const [propinaCustom, setPropinaCustom] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -125,7 +129,17 @@ export default function POSPage() {
     }
   }, [])
 
+  const cargarEquilibrio = useCallback(async () => {
+    if (!isAdmin) return
+    try {
+      setEquilibrio(await obtenerEquilibrio())
+    } catch {
+      // equilibrio is optional; silently ignore
+    }
+  }, [isAdmin])
+
   useEffect(() => { cargar() }, [cargar])
+  useEffect(() => { cargarEquilibrio() }, [cargarEquilibrio])
 
   // Hidratar ticket desde el state de navegación
   const hidratarTicket = useCallback(async (ticketId: number) => {
@@ -376,6 +390,7 @@ export default function POSPage() {
       }
       setVentaExitosa(venta)
       clearCart()
+      cargarEquilibrio()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al procesar la venta')
     } finally {
@@ -429,6 +444,35 @@ export default function POSPage() {
             </button>
           ))}
         </div>
+
+        {isAdmin && equilibrio && (
+          <div className={`flex-shrink-0 mx-4 mt-2 rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm ${
+            equilibrio.faltante === 0
+              ? 'bg-emerald-50 border border-emerald-100'
+              : 'bg-surface-muted border border-stone-100'
+          }`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-xs font-medium ${equilibrio.faltante === 0 ? 'text-emerald-700' : 'text-stone-600'}`}>
+                  Punto de equilibrio — {equilibrio.porcentaje}%
+                </span>
+                {equilibrio.faltante === 0 ? (
+                  <span className="text-xs text-emerald-600 font-semibold">Alcanzado</span>
+                ) : (
+                  <span className="text-xs text-stone-400">
+                    faltan <strong className="text-stone-600">{fmt(equilibrio.faltante)}</strong> en ventas
+                  </span>
+                )}
+              </div>
+              <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${equilibrio.faltante === 0 ? 'bg-emerald-500' : 'bg-forest'}`}
+                  style={{ width: `${Math.min(equilibrio.porcentaje, 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex-shrink-0 px-4 pt-3 pb-2">
           <div className="relative">
@@ -1059,6 +1103,34 @@ export default function POSPage() {
               <span>Total</span>
               <span className="text-forest text-lg">{fmt(ventaExitosa.total)}</span>
             </div>
+
+            {isAdmin && equilibrio && (
+              <div className={`rounded-xl px-4 py-3 ${
+                equilibrio.faltante === 0
+                  ? 'bg-emerald-50 border border-emerald-100'
+                  : 'bg-surface-muted border border-stone-100'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-xs font-semibold ${equilibrio.faltante === 0 ? 'text-emerald-700' : 'text-stone-600'}`}>
+                    {equilibrio.faltante === 0 ? 'Punto de equilibrio alcanzado' : 'Punto de equilibrio'}
+                  </span>
+                  <span className={`text-xs font-bold ${equilibrio.faltante === 0 ? 'text-emerald-600' : 'text-forest'}`}>
+                    {equilibrio.porcentaje}%
+                  </span>
+                </div>
+                <div className="h-1.5 bg-white/60 rounded-full overflow-hidden mb-1.5">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${equilibrio.faltante === 0 ? 'bg-emerald-500' : 'bg-forest'}`}
+                    style={{ width: `${Math.min(equilibrio.porcentaje, 100)}%` }}
+                  />
+                </div>
+                {equilibrio.faltante > 0 && (
+                  <p className="text-xs text-stone-500">
+                    {fmt(equilibrio.ingresosDelMes)} de {fmt(equilibrio.totalGastosFijos)} · faltan <strong className="text-stone-700">{fmt(equilibrio.faltante)}</strong>
+                  </p>
+                )}
+              </div>
+            )}
 
             <button onClick={() => setVentaExitosa(null)} className="btn-primary w-full py-2.5">
               Nueva venta
