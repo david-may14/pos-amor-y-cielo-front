@@ -38,6 +38,22 @@ const authHeaders = (): Record<string, string> => {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+export const exportarIngredientes = (): Promise<void> => {
+  const token = localStorage.getItem('pos_token')
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+  return fetch(`${BASE_URL}/api/ingredientes/export`, { headers })
+    .then(async (r) => {
+      if (!r.ok) throw new Error(await r.text())
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'ingredientes.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+}
+
 export const previewImportIngredientes = (file: File): Promise<IngPreviewResult> => {
   const form = new FormData()
   form.append('file', file)

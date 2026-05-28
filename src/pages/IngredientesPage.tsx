@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { listarIngredientes, crearIngrediente, actualizarIngrediente, obtenerSubreceta, guardarSubreceta, eliminarSubreceta } from '../api/ingredientes'
+import { listarIngredientes, crearIngrediente, actualizarIngrediente, obtenerSubreceta, guardarSubreceta, eliminarSubreceta, exportarIngredientes } from '../api/ingredientes'
 import { registrarAjuste } from '../api/inventario'
 import type { Ingrediente, SubrecetaDTO, IngImportResult } from '../types/api'
 import Modal from '../components/Modal'
@@ -252,6 +252,12 @@ export default function IngredientesPage() {
           <p className="text-sm text-stone-400 mt-0.5">Usa la misma unidad en todo: ingrediente, receta e inventario</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => exportarIngredientes()} className="btn-secondary flex items-center gap-1.5 text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5 0-4.5 4.5M12 3v13.5m4.5-4.5L12 16.5" />
+            </svg>
+            Exportar CSV
+          </button>
           <button onClick={() => setShowImport(true)} className="btn-secondary flex items-center gap-1.5 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
