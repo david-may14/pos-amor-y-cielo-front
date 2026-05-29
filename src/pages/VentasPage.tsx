@@ -109,7 +109,7 @@ export default function VentasPage() {
             <>
               <div className={`grid gap-4 mb-3 ${isAdmin ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'}`}>
                 <ResumenCard label="Ventas" value={String(resumen.totalVentas)} />
-                <ResumenCard label="Ingresos" value={fmt(resumen.ingresos)} highlight />
+                <ResumenCard label={isAdmin ? 'Ingresos' : 'Total de Ventas'} value={fmt(resumen.ingresos)} highlight />
                 {isAdmin && <ResumenCard label="Costos" value={fmt(resumen.costos)} />}
                 {isAdmin && <ResumenCard label="Utilidad neta" value={fmt(resumen.utilidad)} green />}
               </div>
