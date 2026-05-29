@@ -328,6 +328,26 @@ export interface ResumenDia {
   ventasPorMetodoPago: Record<string, number>
 }
 
+export interface TopProducto {
+  nombre: string
+  cantidad: number
+  ingresos: number
+}
+
+export interface ResumenPeriodo {
+  desde: string
+  hasta: string
+  totalVentas: number
+  ingresos: number
+  costos: number
+  totalIva: number
+  totalComisiones: number
+  utilidad: number
+  ventasPorMetodoPago: Record<string, number>
+  porDia: ResumenDia[]
+  topProductos: TopProducto[]
+}
+
 // ─── Plantillas de receta ─────────────────────────────────────────────────────
 export interface IngredienteLineaPlantillaDTO {
   id: number

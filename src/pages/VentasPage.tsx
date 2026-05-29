@@ -86,12 +86,14 @@ export default function VentasPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-stone-800">Ventas</h1>
-        <input
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-          className="input w-auto text-sm"
-        />
+        {isAdmin && (
+          <input
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+            className="input w-auto text-sm"
+          />
+        )}
       </div>
 
       {error && (
