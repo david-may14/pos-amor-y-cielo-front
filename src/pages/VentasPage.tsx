@@ -107,11 +107,11 @@ export default function VentasPage() {
           {/* Resumen cards */}
           {resumen && (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-3">
+              <div className={`grid gap-4 mb-3 ${isAdmin ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'}`}>
                 <ResumenCard label="Ventas" value={String(resumen.totalVentas)} />
                 <ResumenCard label="Ingresos" value={fmt(resumen.ingresos)} highlight />
-                <ResumenCard label="Costos" value={fmt(resumen.costos)} />
-                <ResumenCard label="Utilidad neta" value={fmt(resumen.utilidad)} green />
+                {isAdmin && <ResumenCard label="Costos" value={fmt(resumen.costos)} />}
+                {isAdmin && <ResumenCard label="Utilidad neta" value={fmt(resumen.utilidad)} green />}
               </div>
               {isAdmin && (resumen.totalIva > 0 || resumen.totalComisiones > 0) && (
                 <div className="card px-5 py-3 mb-6 flex gap-6 flex-wrap text-xs">
