@@ -53,7 +53,7 @@ export default function ProductosPage() {
   const [recetaLoading, setRecetaLoading] = useState(false)
   const [recetaError, setRecetaError] = useState('')
   const [recetaSuccess, setRecetaSuccess] = useState(false)
-  const [newRecetaLinea, setNewRecetaLinea] = useState({ ingredienteId: '', cantidad: '' })
+  const [newRecetaLinea, setNewRecetaLinea] = useState({ ingredienteId: '', cantidad: '', merma: '' })
 
   const [busqueda, setBusqueda] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
@@ -167,17 +167,18 @@ export default function ProductosPage() {
         const linea: RecetaLineaDTO = {
           id: 0, ingredienteId: ing.id, ingredienteNombre: ing.nombre,
           unidad: ing.unidad, cantidad: parseFloat(newRecetaLinea.cantidad),
+          mermaPorcentaje: parseFloat(newRecetaLinea.merma) || 0,
         }
         lineasBase = [...lineasBase.filter((l) => l.ingredienteId !== ing.id), linea]
         setReceta(lineasBase)
-        setNewRecetaLinea({ ingredienteId: '', cantidad: '' })
+        setNewRecetaLinea({ ingredienteId: '', cantidad: '', merma: '' })
       }
     }
     setSaving(true)
     setRecetaError('')
     setRecetaSuccess(false)
     try {
-      const lineas = lineasBase.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad }))
+      const lineas = lineasBase.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad, mermaPorcentaje: l.mermaPorcentaje ?? 0 }))
       const updated = await reemplazarReceta(recetaProducto.id, lineas)
       setReceta(updated)
       setRecetaSuccess(true)
@@ -275,9 +276,10 @@ export default function ProductosPage() {
       ingredienteNombre: ing.nombre,
       unidad: ing.unidad,
       cantidad: parseFloat(newRecetaLinea.cantidad),
+      mermaPorcentaje: parseFloat(newRecetaLinea.merma) || 0,
     }
     setReceta((prev) => [...prev.filter((l) => l.ingredienteId !== ing.id), linea])
-    setNewRecetaLinea({ ingredienteId: '', cantidad: '' })
+    setNewRecetaLinea({ ingredienteId: '', cantidad: '', merma: '' })
   }
 
   if (loading) {
@@ -662,6 +664,11 @@ export default function ProductosPage() {
                       <span className="text-sm text-stone-700">{l.ingredienteNombre}</span>
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-stone-500">{l.cantidad} {l.unidad}</span>
+                        {l.mermaPorcentaje > 0 && (
+                          <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">
+                            +{l.mermaPorcentaje}% merma
+                          </span>
+                        )}
                         <button
                           onClick={() => setReceta((prev) => prev.filter((x) => x.ingredienteId !== l.ingredienteId))}
                           className="text-red-400 hover:text-red-600 text-sm"
@@ -692,12 +699,18 @@ export default function ProductosPage() {
                   </select>
                   <input
                     className="input w-24"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="number" min="0" step="0.01"
                     placeholder="Cantidad"
                     value={newRecetaLinea.cantidad}
                     onChange={(e) => setNewRecetaLinea({ ...newRecetaLinea, cantidad: e.target.value })}
+                  />
+                  <input
+                    className="input w-20"
+                    type="number" min="0" max="100" step="0.5"
+                    placeholder="Merma %"
+                    title="% de merma (ej. 10 = 10% extra de consumo)"
+                    value={newRecetaLinea.merma}
+                    onChange={(e) => setNewRecetaLinea({ ...newRecetaLinea, merma: e.target.value })}
                   />
                   <button onClick={addRecetaLinea} className="btn-secondary px-3">+</button>
                 </div>

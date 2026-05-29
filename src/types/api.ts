@@ -94,10 +94,12 @@ export interface RecetaLineaDTO {
   ingredienteNombre: string
   unidad: string
   cantidad: number
+  mermaPorcentaje: number
 }
 export interface RecetaLineaRequest {
   ingredienteId: number
   cantidad: number
+  mermaPorcentaje: number
 }
 
 // ─── Ingredientes ─────────────────────────────────────────────────────────────
@@ -157,6 +159,7 @@ export interface SubrecetaLineaDTO {
   baseNombre: string
   baseUnidad: string
   cantidad: number
+  mermaPorcentaje: number
 }
 export interface SubrecetaDTO {
   rendimientoLote: number | null
@@ -166,6 +169,7 @@ export interface SubrecetaDTO {
 export interface SubrecetaLineaRequest {
   baseId: number
   cantidad: number
+  mermaPorcentaje: number
 }
 export interface SubrecetaRequest {
   rendimientoLote: number
@@ -355,6 +359,7 @@ export interface IngredienteLineaPlantillaDTO {
   ingredienteNombre: string
   unidad: string
   cantidad: number
+  mermaPorcentaje: number
 }
 export interface PlantillaDTO {
   id: number

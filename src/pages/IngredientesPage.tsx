@@ -66,7 +66,7 @@ export default function IngredientesPage() {
   const [subrecetaError, setSubrecetaError] = useState('')
   const [subrecetaSaving, setSubrecetaSaving] = useState(false)
   const [srRendimiento, setSrRendimiento] = useState('')
-  const [srLineas, setSrLineas] = useState<{ baseId: string; cantidad: string }[]>([{ baseId: '', cantidad: '' }])
+  const [srLineas, setSrLineas] = useState<{ baseId: string; cantidad: string; merma: string }[]>([{ baseId: '', cantidad: '', merma: '' }])
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -87,7 +87,7 @@ export default function IngredientesPage() {
     setSubreceta(null)
     setSubrecetaError('')
     setSrRendimiento('')
-    setSrLineas([{ baseId: '', cantidad: '' }])
+    setSrLineas([{ baseId: '', cantidad: '', merma: '' }])
     setShowSubreceta(true)
   }
 
@@ -102,8 +102,8 @@ export default function IngredientesPage() {
       setSubreceta(data)
       setSrRendimiento(data.rendimientoLote != null ? String(data.rendimientoLote) : '')
       setSrLineas(data.lineas.length > 0
-        ? data.lineas.map(l => ({ baseId: String(l.baseId), cantidad: String(l.cantidad) }))
-        : [{ baseId: '', cantidad: '' }])
+        ? data.lineas.map(l => ({ baseId: String(l.baseId), cantidad: String(l.cantidad), merma: String(l.mermaPorcentaje ?? 0) }))
+        : [{ baseId: '', cantidad: '', merma: '' }])
     } catch (e: unknown) {
       setSubrecetaError(e instanceof Error ? e.message : 'Error al cargar')
     } finally {
@@ -113,7 +113,7 @@ export default function IngredientesPage() {
 
   const handleSeleccionarIngSubreceta = async (id: string) => {
     setSubrecetaIngId(id)
-    if (!id) { setSubrecetaIng(null); setSubreceta(null); setSrRendimiento(''); setSrLineas([{ baseId: '', cantidad: '' }]); return }
+    if (!id) { setSubrecetaIng(null); setSubreceta(null); setSrRendimiento(''); setSrLineas([{ baseId: '', cantidad: '', merma: '' }]); return }
     const ing = ingredientes.find(i => i.id === parseInt(id))
     if (!ing) return
     setSubrecetaIng(ing)
@@ -124,12 +124,12 @@ export default function IngredientesPage() {
       setSubreceta(data)
       setSrRendimiento(data.rendimientoLote != null ? String(data.rendimientoLote) : '')
       setSrLineas(data.lineas.length > 0
-        ? data.lineas.map(l => ({ baseId: String(l.baseId), cantidad: String(l.cantidad) }))
-        : [{ baseId: '', cantidad: '' }])
+        ? data.lineas.map(l => ({ baseId: String(l.baseId), cantidad: String(l.cantidad), merma: String(l.mermaPorcentaje ?? 0) }))
+        : [{ baseId: '', cantidad: '', merma: '' }])
     } catch {
       setSubreceta(null)
       setSrRendimiento('')
-      setSrLineas([{ baseId: '', cantidad: '' }])
+      setSrLineas([{ baseId: '', cantidad: '', merma: '' }])
     } finally {
       setSubrecetaLoading(false)
     }
@@ -146,7 +146,7 @@ export default function IngredientesPage() {
     try {
       await guardarSubreceta(subrecetaIng.id, {
         rendimientoLote: rendimiento,
-        lineas: lineasValidas.map(l => ({ baseId: parseInt(l.baseId), cantidad: parseFloat(l.cantidad) })),
+        lineas: lineasValidas.map(l => ({ baseId: parseInt(l.baseId), cantidad: parseFloat(l.cantidad), mermaPorcentaje: parseFloat(l.merma) || 0 })),
       })
       setIngredientes(prev => prev.map(i => i.id === subrecetaIng.id ? { ...i, rendimientoLote: rendimiento } : i))
       setShowSubreceta(false)
@@ -592,13 +592,19 @@ export default function IngredientesPage() {
                               ))}
                           </select>
                           <input
-                            className="input w-28"
-                            type="number"
-                            min="0.001"
-                            step="0.001"
+                            className="input w-24"
+                            type="number" min="0.001" step="0.001"
                             placeholder="Cantidad"
                             value={linea.cantidad}
                             onChange={(e) => setSrLineas(prev => prev.map((l, idx) => idx === i ? { ...l, cantidad: e.target.value } : l))}
+                          />
+                          <input
+                            className="input w-20"
+                            type="number" min="0" max="100" step="0.5"
+                            placeholder="Merma %"
+                            title="% de merma"
+                            value={linea.merma}
+                            onChange={(e) => setSrLineas(prev => prev.map((l, idx) => idx === i ? { ...l, merma: e.target.value } : l))}
                           />
                           {srLineas.length > 1 && (
                             <button
@@ -610,7 +616,7 @@ export default function IngredientesPage() {
                       ))}
                     </div>
                     <button
-                      onClick={() => setSrLineas(prev => [...prev, { baseId: '', cantidad: '' }])}
+                      onClick={() => setSrLineas(prev => [...prev, { baseId: '', cantidad: '', merma: '' }])}
                       className="mt-2 text-xs text-forest hover:underline flex items-center gap-1"
                     >
                       <span className="text-base leading-none">+</span> Agregar ingrediente

@@ -27,8 +27,8 @@ export default function PlantillasPage() {
 
   // Modal ingredientes
   const [ingModal, setIngModal] = useState<PlantillaDTO | null>(null)
-  const [ingLineas, setIngLineas] = useState<{ ingredienteId: number; ingredienteNombre: string; unidad: string; cantidad: number }[]>([])
-  const [newLinea, setNewLinea] = useState({ ingredienteId: '', cantidad: '' })
+  const [ingLineas, setIngLineas] = useState<{ ingredienteId: number; ingredienteNombre: string; unidad: string; cantidad: number; mermaPorcentaje: number }[]>([])
+  const [newLinea, setNewLinea] = useState({ ingredienteId: '', cantidad: '', merma: '' })
   const [ingSaving, setIngSaving] = useState(false)
   const [ingError, setIngError] = useState('')
   const [ingSuccess, setIngSuccess] = useState(false)
@@ -114,8 +114,9 @@ export default function PlantillasPage() {
       ingredienteNombre: l.ingredienteNombre,
       unidad: l.unidad,
       cantidad: l.cantidad,
+      mermaPorcentaje: l.mermaPorcentaje ?? 0,
     })))
-    setNewLinea({ ingredienteId: '', cantidad: '' })
+    setNewLinea({ ingredienteId: '', cantidad: '', merma: '' })
     setIngError('')
     setIngSuccess(false)
   }
@@ -126,9 +127,9 @@ export default function PlantillasPage() {
     if (!ing) return
     setIngLineas((prev) => [
       ...prev.filter((l) => l.ingredienteId !== ing.id),
-      { ingredienteId: ing.id, ingredienteNombre: ing.nombre, unidad: ing.unidad, cantidad: parseFloat(newLinea.cantidad) },
+      { ingredienteId: ing.id, ingredienteNombre: ing.nombre, unidad: ing.unidad, cantidad: parseFloat(newLinea.cantidad), mermaPorcentaje: parseFloat(newLinea.merma) || 0 },
     ])
-    setNewLinea({ ingredienteId: '', cantidad: '' })
+    setNewLinea({ ingredienteId: '', cantidad: '', merma: '' })
   }
 
   const handleGuardarIngredientes = async () => {
@@ -141,10 +142,10 @@ export default function PlantillasPage() {
       if (ing) {
         lineasBase = [
           ...lineasBase.filter((l) => l.ingredienteId !== ing.id),
-          { ingredienteId: ing.id, ingredienteNombre: ing.nombre, unidad: ing.unidad, cantidad: parseFloat(newLinea.cantidad) },
+          { ingredienteId: ing.id, ingredienteNombre: ing.nombre, unidad: ing.unidad, cantidad: parseFloat(newLinea.cantidad), mermaPorcentaje: parseFloat(newLinea.merma) || 0 },
         ]
         setIngLineas(lineasBase)
-        setNewLinea({ ingredienteId: '', cantidad: '' })
+        setNewLinea({ ingredienteId: '', cantidad: '', merma: '' })
       }
     }
 
@@ -154,7 +155,7 @@ export default function PlantillasPage() {
     try {
       const updated = await reemplazarIngredientes(
         ingModal.id,
-        lineasBase.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad }))
+        lineasBase.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad, mermaPorcentaje: l.mermaPorcentaje ?? 0 }))
       )
       setPlantillas((prev) => prev.map((p) => p.id === ingModal.id ? updated : p))
       setIngModal(updated)
@@ -332,6 +333,11 @@ export default function PlantillasPage() {
                     <span className="text-sm text-stone-700">{l.ingredienteNombre}</span>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-stone-500">{l.cantidad} {l.unidad}</span>
+                      {l.mermaPorcentaje > 0 && (
+                        <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">
+                          +{l.mermaPorcentaje}% merma
+                        </span>
+                      )}
                       <button
                         onClick={() => setIngLineas((prev) => prev.filter((x) => x.ingredienteId !== l.ingredienteId))}
                         className="text-red-400 hover:text-red-600 text-sm leading-none"
@@ -362,14 +368,20 @@ export default function PlantillasPage() {
                     ))}
                 </select>
                 <input
-                  className="input w-28"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  className="input w-24"
+                  type="number" min="0" step="0.01"
                   placeholder="Cantidad"
                   value={newLinea.cantidad}
                   onChange={(e) => setNewLinea({ ...newLinea, cantidad: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && addIngLinea()}
+                />
+                <input
+                  className="input w-20"
+                  type="number" min="0" max="100" step="0.5"
+                  placeholder="Merma %"
+                  title="% de merma"
+                  value={newLinea.merma}
+                  onChange={(e) => setNewLinea({ ...newLinea, merma: e.target.value })}
                 />
                 <button onClick={addIngLinea} className="btn-secondary px-3">+</button>
               </div>
