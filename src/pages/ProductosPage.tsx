@@ -595,32 +595,62 @@ export default function ProductosPage() {
               {recetaError && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{recetaError}</p>
               )}
-              {/* Current recipe */}
-              {receta.length > 0 ? (
-                <div className="space-y-2">
-                  {receta.map((l) => (
-                    <div key={l.ingredienteId} className="flex items-center justify-between bg-surface-muted rounded-lg px-4 py-2.5">
-                      <span className="text-sm text-stone-700">{l.ingredienteNombre}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-stone-500">{l.cantidad} {l.unidad}</span>
-                        {l.mermaPorcentaje > 0 && (
-                          <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">
-                            +{l.mermaPorcentaje}% merma
-                          </span>
-                        )}
-                        <button
-                          onClick={() => setReceta((prev) => prev.filter((x) => x.ingredienteId !== l.ingredienteId))}
-                          className="text-red-400 hover:text-red-600 text-sm"
-                        >
-                          ×
-                        </button>
+              {/* Ingredientes directos + plantillas activas colapsables */}
+              {(() => {
+                const plantillasActivas = todasPlantillas.filter((pl) => plantillasSeleccionadas.has(pl.id))
+                const hayContenido = receta.length > 0 || plantillasActivas.length > 0
+                return hayContenido ? (
+                  <div className="space-y-1.5">
+                    {receta.map((l) => (
+                      <div key={l.ingredienteId} className="flex items-center justify-between bg-surface-muted rounded-lg px-4 py-2.5">
+                        <span className="text-sm text-stone-700">{l.ingredienteNombre}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-stone-500">{l.cantidad} {l.unidad}</span>
+                          {l.mermaPorcentaje > 0 && (
+                            <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">+{l.mermaPorcentaje}%</span>
+                          )}
+                          <button onClick={() => setReceta((prev) => prev.filter((x) => x.ingredienteId !== l.ingredienteId))}
+                            className="text-red-400 hover:text-red-600 text-sm">×</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-stone-400 text-center py-4">Sin ingredientes en la receta</p>
-              )}
+                    ))}
+                    {plantillasActivas.map((pl) => {
+                      const exp = plantillasExpandidas.has(pl.id)
+                      return (
+                        <div key={`pl-${pl.id}`} className="border border-forest/20 bg-forest/5 rounded-lg overflow-hidden">
+                          <button
+                            onClick={() => setPlantillasExpandidas((prev) => {
+                              const next = new Set(prev); exp ? next.delete(pl.id) : next.add(pl.id); return next
+                            })}
+                            className="w-full flex items-center gap-2 px-4 py-2.5 text-left"
+                          >
+                            <svg className={`w-3.5 h-3.5 text-forest/60 transition-transform shrink-0 ${exp ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+                            </svg>
+                            <span className="text-sm font-medium text-forest">{pl.nombre}</span>
+                            <span className="text-xs text-forest/50 ml-auto">{pl.ingredientes.length} ingrediente{pl.ingredientes.length !== 1 ? 's' : ''}</span>
+                          </button>
+                          {exp && (
+                            <div className="border-t border-forest/10 px-4 py-2 space-y-1.5">
+                              {pl.ingredientes.map((i) => (
+                                <div key={i.id} className="flex items-center justify-between text-xs">
+                                  <span className="text-stone-600">{i.ingredienteNombre}</span>
+                                  <div className="flex items-center gap-1.5 text-stone-400">
+                                    <span>{i.cantidad} {i.unidad}</span>
+                                    {i.mermaPorcentaje > 0 && <span className="text-amber-500">+{i.mermaPorcentaje}%</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-stone-400 text-center py-4">Sin ingredientes en la receta</p>
+                )
+              })()}
 
               {/* Add line */}
               <div className="border-t border-stone-100 pt-4 space-y-2">
