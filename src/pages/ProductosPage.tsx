@@ -77,6 +77,7 @@ export default function ProductosPage() {
   const [plantillasLoading, setPlantillasLoading] = useState(false)
   const [plantillasSaving, setPlantillasSaving] = useState(false)
   const [plantillasError, setPlantillasError] = useState('')
+  const [plantillasExpandidas, setPlantillasExpandidas] = useState<Set<number>>(new Set())
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -660,26 +661,65 @@ export default function ProductosPage() {
                   <div className="space-y-2">
                     {todasPlantillas.map((pl) => {
                       const sel = plantillasSeleccionadas.has(pl.id)
+                      const exp = plantillasExpandidas.has(pl.id)
                       return (
-                        <div key={pl.id} className="flex items-center justify-between bg-surface-muted rounded-lg px-3 py-2.5">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-stone-700">{pl.nombre}</p>
-                            {pl.ingredientes.length > 0 && (
-                              <p className="text-xs text-stone-400 truncate">
-                                {pl.ingredientes.map((i) => i.ingredienteNombre).join(', ')}
-                              </p>
-                            )}
+                        <div key={pl.id} className={`rounded-lg border transition-colors ${sel ? 'border-forest/20 bg-forest/5' : 'border-stone-100 bg-surface-muted'}`}>
+                          {/* Header row */}
+                          <div className="flex items-center gap-2 px-3 py-2.5">
+                            {/* Expand toggle */}
+                            <button
+                              onClick={() => setPlantillasExpandidas((prev) => {
+                                const next = new Set(prev)
+                                exp ? next.delete(pl.id) : next.add(pl.id)
+                                return next
+                              })}
+                              className="text-stone-400 hover:text-stone-600 shrink-0"
+                            >
+                              <svg className={`w-3.5 h-3.5 transition-transform ${exp ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+                              </svg>
+                            </button>
+                            {/* Name */}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-stone-700">{pl.nombre}</p>
+                              {!exp && pl.ingredientes.length > 0 && (
+                                <p className="text-xs text-stone-400 truncate">
+                                  {pl.ingredientes.map((i) => i.ingredienteNombre).join(' · ')}
+                                </p>
+                              )}
+                            </div>
+                            {/* Toggle switch */}
+                            <button
+                              onClick={() => setPlantillasSeleccionadas((prev) => {
+                                const next = new Set(prev)
+                                sel ? next.delete(pl.id) : next.add(pl.id)
+                                return next
+                              })}
+                              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${sel ? 'bg-forest' : 'bg-stone-200'}`}
+                            >
+                              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${sel ? 'left-5' : 'left-0.5'}`} />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => setPlantillasSeleccionadas((prev) => {
-                              const next = new Set(prev)
-                              sel ? next.delete(pl.id) : next.add(pl.id)
-                              return next
-                            })}
-                            className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ml-3 ${sel ? 'bg-forest' : 'bg-stone-200'}`}
-                          >
-                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${sel ? 'left-5' : 'left-0.5'}`} />
-                          </button>
+                          {/* Expandable ingredient list */}
+                          {exp && (
+                            <div className="border-t border-stone-100 px-3 pb-2.5 pt-2 space-y-1">
+                              {pl.ingredientes.length === 0 ? (
+                                <p className="text-xs text-stone-400 italic">Sin ingredientes</p>
+                              ) : (
+                                pl.ingredientes.map((i) => (
+                                  <div key={i.id} className="flex items-center justify-between text-xs">
+                                    <span className="text-stone-600">{i.ingredienteNombre}</span>
+                                    <span className="text-stone-400">
+                                      {i.cantidad} {i.unidad}
+                                      {i.mermaPorcentaje > 0 && (
+                                        <span className="ml-1 text-amber-500">+{i.mermaPorcentaje}%</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
