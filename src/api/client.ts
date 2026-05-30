@@ -17,6 +17,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (res.status === 401) {
     localStorage.removeItem('pos_token')
     localStorage.removeItem('pos_user')
+    sessionStorage.setItem('session_expired', '1')
     window.location.href = '/login'
     throw new Error('Sesión expirada')
   }

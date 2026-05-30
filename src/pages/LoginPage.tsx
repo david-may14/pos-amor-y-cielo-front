@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const sessionExpired = sessionStorage.getItem('session_expired') === '1'
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -17,6 +18,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
+      sessionStorage.removeItem('session_expired')
       navigate('/pos')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Credenciales incorrectas')
@@ -54,8 +56,23 @@ export default function LoginPage() {
             />
           </div>
 
-          <h1 className="text-2xl font-semibold text-stone-800 mb-1">Bienvenido</h1>
-          <p className="text-sm text-stone-400 mb-8">Ingresa tus credenciales para continuar.</p>
+          <h1 className="text-2xl font-semibold text-stone-800 mb-1">
+            {sessionExpired ? 'Sesión expirada' : 'Bienvenido'}
+          </h1>
+          <p className="text-sm text-stone-400 mb-8">
+            {sessionExpired
+              ? 'Tu sesión cerró automáticamente. Vuelve a iniciar sesión para continuar.'
+              : 'Ingresa tus credenciales para continuar.'}
+          </p>
+
+          {sessionExpired && (
+            <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 text-amber-700 text-sm rounded-xl px-4 py-3 mb-6">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              La sesión dura 8 horas (un turno). Ingresa de nuevo para continuar.
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-6">
