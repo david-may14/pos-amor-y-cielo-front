@@ -19,6 +19,7 @@ import { listarCategorias } from '../api/categorias'
 import { listarIngredientes } from '../api/ingredientes'
 import { listarPlantillas } from '../api/plantillas'
 import type { ProductoDTO, Categoria, RecetaLineaDTO, Ingrediente, ModificadorGrupo, PlantillaDTO, ImportResult } from '../types/api'
+import SearchableSelect from '../components/SearchableSelect'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 import ImportarProductosModal from '../components/ImportarProductosModal'
@@ -54,7 +55,6 @@ export default function ProductosPage() {
   const [recetaError, setRecetaError] = useState('')
   const [recetaSuccess, setRecetaSuccess] = useState(false)
   const [newRecetaLinea, setNewRecetaLinea] = useState({ ingredienteId: '', cantidad: '', merma: '' })
-  const [busquedaIng, setBusquedaIng] = useState('')
 
   const [busqueda, setBusqueda] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
@@ -687,25 +687,13 @@ export default function ProductosPage() {
               {/* Add line */}
               <div className="border-t border-stone-100 pt-4 space-y-2">
                 <p className="text-xs font-medium text-stone-500">Agregar ingrediente</p>
-                <input
-                  className="input w-full"
-                  placeholder="Buscar ingrediente…"
-                  value={busquedaIng}
-                  onChange={(e) => setBusquedaIng(e.target.value)}
-                />
                 <div className="flex gap-2">
-                  <select
-                    className="input flex-1"
+                  <SearchableSelect
+                    className="flex-1"
+                    options={ingredientes.map((i) => ({ value: String(i.id), label: `${i.nombre} (${i.unidad})` }))}
                     value={newRecetaLinea.ingredienteId}
-                    onChange={(e) => setNewRecetaLinea({ ...newRecetaLinea, ingredienteId: e.target.value })}
-                  >
-                    <option value="">Seleccionar…</option>
-                    {ingredientes
-                      .filter((i) => i.nombre.toLowerCase().includes(busquedaIng.toLowerCase()))
-                      .map((i) => (
-                        <option key={i.id} value={i.id}>{i.nombre} ({i.unidad})</option>
-                      ))}
-                  </select>
+                    onChange={(v) => setNewRecetaLinea({ ...newRecetaLinea, ingredienteId: v })}
+                  />
                   <input
                     className="input w-24"
                     type="number" min="0" step="0.01"

@@ -6,6 +6,7 @@ import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 import ImportarIngredientesModal from '../components/ImportarIngredientesModal'
 import PreciosIngredienteModal from '../components/PreciosIngredienteModal'
+import SearchableSelect from '../components/SearchableSelect'
 
 const UNIDADES = [
   { value: 'g',     label: 'g — gramos' },
@@ -67,7 +68,6 @@ export default function IngredientesPage() {
   const [subrecetaSaving, setSubrecetaSaving] = useState(false)
   const [srRendimiento, setSrRendimiento] = useState('')
   const [srLineas, setSrLineas] = useState<{ baseId: string; cantidad: string; merma: string }[]>([{ baseId: '', cantidad: '', merma: '' }])
-  const [srBusqueda, setSrBusqueda] = useState('')
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -577,27 +577,17 @@ export default function IngredientesPage() {
 
                   <div>
                     <label className="label">Ingredientes base</label>
-                    <input
-                      className="input w-full mb-2"
-                      placeholder="Buscar ingrediente…"
-                      value={srBusqueda}
-                      onChange={(e) => setSrBusqueda(e.target.value)}
-                    />
                     <div className="space-y-2">
                       {srLineas.map((linea, i) => (
                         <div key={i} className="flex gap-2 items-center">
-                          <select
-                            className="input flex-1"
+                          <SearchableSelect
+                            className="flex-1"
+                            options={ingredientes
+                              .filter(i2 => i2.id !== subrecetaIng.id)
+                              .map(i2 => ({ value: String(i2.id), label: `${i2.nombre} (${i2.unidad})` }))}
                             value={linea.baseId}
-                            onChange={(e) => setSrLineas(prev => prev.map((l, idx) => idx === i ? { ...l, baseId: e.target.value } : l))}
-                          >
-                            <option value="">Seleccionar…</option>
-                            {ingredientes
-                              .filter(i2 => i2.id !== subrecetaIng.id && i2.nombre.toLowerCase().includes(srBusqueda.toLowerCase()))
-                              .map(i2 => (
-                                <option key={i2.id} value={i2.id}>{i2.nombre} ({i2.unidad})</option>
-                              ))}
-                          </select>
+                            onChange={(v) => setSrLineas(prev => prev.map((l, idx) => idx === i ? { ...l, baseId: v } : l))}
+                          />
                           <input
                             className="input w-24"
                             type="number" min="0.001" step="0.001"

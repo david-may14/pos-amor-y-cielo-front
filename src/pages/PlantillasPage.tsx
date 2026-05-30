@@ -11,6 +11,7 @@ import { listarIngredientes } from '../api/ingredientes'
 import type { PlantillaDTO, Ingrediente } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
+import SearchableSelect from '../components/SearchableSelect'
 
 export default function PlantillasPage() {
   const [plantillas, setPlantillas] = useState<PlantillaDTO[]>([])
@@ -29,7 +30,6 @@ export default function PlantillasPage() {
   const [ingModal, setIngModal] = useState<PlantillaDTO | null>(null)
   const [ingLineas, setIngLineas] = useState<{ ingredienteId: number; ingredienteNombre: string; unidad: string; cantidad: number; mermaPorcentaje: number }[]>([])
   const [newLinea, setNewLinea] = useState({ ingredienteId: '', cantidad: '', merma: '' })
-  const [busquedaIng, setBusquedaIng] = useState('')
   const [ingSaving, setIngSaving] = useState(false)
   const [ingError, setIngError] = useState('')
   const [ingSuccess, setIngSuccess] = useState(false)
@@ -355,25 +355,15 @@ export default function PlantillasPage() {
 
             <div className="border-t border-stone-100 pt-4 space-y-2">
               <p className="text-xs font-medium text-stone-500">Agregar ingrediente</p>
-              <input
-                className="input w-full"
-                placeholder="Buscar ingrediente…"
-                value={busquedaIng}
-                onChange={(e) => setBusquedaIng(e.target.value)}
-              />
               <div className="flex gap-2">
-                <select
-                  className="input flex-1"
+                <SearchableSelect
+                  className="flex-1"
+                  options={ingredientes
+                    .filter((i) => !ingLineas.some((l) => l.ingredienteId === i.id))
+                    .map((i) => ({ value: String(i.id), label: `${i.nombre} (${i.unidad})` }))}
                   value={newLinea.ingredienteId}
-                  onChange={(e) => setNewLinea({ ...newLinea, ingredienteId: e.target.value })}
-                >
-                  <option value="">Seleccionar…</option>
-                  {ingredientes
-                    .filter((i) => !ingLineas.some((l) => l.ingredienteId === i.id) && i.nombre.toLowerCase().includes(busquedaIng.toLowerCase()))
-                    .map((i) => (
-                      <option key={i.id} value={i.id}>{i.nombre} ({i.unidad})</option>
-                    ))}
-                </select>
+                  onChange={(v) => setNewLinea({ ...newLinea, ingredienteId: v })}
+                />
                 <input
                   className="input w-24"
                   type="number" min="0" step="0.01"
