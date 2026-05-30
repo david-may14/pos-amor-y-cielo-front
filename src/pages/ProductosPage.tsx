@@ -148,12 +148,18 @@ export default function ProductosPage() {
     setRecetaProducto(p)
     setRecetaLoading(true)
     setRecetaError('')
-    
-    setNewRecetaLinea({ ingredienteId: '', cantidad: '' })
+    setNewRecetaLinea({ ingredienteId: '', cantidad: '', merma: '' })
     try {
-      const [r, ings] = await Promise.all([obtenerReceta(p.id), listarIngredientes()])
+      const [r, ings, todas, actuales] = await Promise.all([
+        obtenerReceta(p.id),
+        listarIngredientes(),
+        listarPlantillas(),
+        listarPlantillasProducto(p.id),
+      ])
       setReceta(r)
       setIngredientes(ings)
+      setTodasPlantillas(todas)
+      setPlantillasSeleccionadas(new Set(actuales.map((pl) => pl.id)))
     } finally {
       setRecetaLoading(false)
     }
@@ -181,7 +187,10 @@ export default function ProductosPage() {
     
     try {
       const lineas = lineasBase.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad, mermaPorcentaje: l.mermaPorcentaje ?? 0 }))
-      const updated = await reemplazarReceta(recetaProducto.id, lineas)
+      const [updated] = await Promise.all([
+        reemplazarReceta(recetaProducto.id, lineas),
+        asignarPlantillasProducto(recetaProducto.id, [...plantillasSeleccionadas]),
+      ])
       setReceta(updated)
       setToastMsg("Receta guardada")
     } catch (e: unknown) {
@@ -423,9 +432,7 @@ export default function ProductosPage() {
                     <button onClick={() => openReceta(p)} className="text-xs text-stone-400 hover:text-forest transition-colors">
                       Receta
                     </button>
-                    <button onClick={() => openPlantillas(p)} className="text-xs text-stone-400 hover:text-forest transition-colors">
-                      Plantillas
-                    </button>
+
                     <button onClick={() => openModificadores(p)} className="text-xs text-stone-400 hover:text-forest transition-colors">
                       Modificadores
                     </button>
@@ -565,74 +572,6 @@ export default function ProductosPage() {
         </Modal>
       )}
 
-      {/* Plantillas modal */}
-      {plantillasProducto && (
-        <Modal
-          title={`Plantillas — ${plantillasProducto.nombre}`}
-          onClose={() => setPlantillasProducto(null)}
-          size="md"
-        >
-          {plantillasLoading ? (
-            <div className="flex justify-center py-8">
-              <Spinner className="w-6 h-6 text-forest" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {plantillasError && (
-                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{plantillasError}</p>
-              )}
-              {todasPlantillas.length === 0 ? (
-                <p className="text-sm text-stone-400 text-center py-8">
-                  No hay plantillas. Créalas en la sección <strong>Plantillas</strong>.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {todasPlantillas.map((pl) => {
-                    const seleccionada = plantillasSeleccionadas.has(pl.id)
-                    return (
-                      <div key={pl.id} className="flex items-center justify-between bg-surface-muted rounded-xl px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-stone-800">{pl.nombre}</p>
-                          <p className="text-xs text-stone-400">
-                            {pl.ingredientes.length === 0
-                              ? 'Sin ingredientes'
-                              : pl.ingredientes.map((i) => `${i.ingredienteNombre}`).join(', ')}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setPlantillasSeleccionadas((prev) => {
-                              const next = new Set(prev)
-                              if (seleccionada) next.delete(pl.id)
-                              else next.add(pl.id)
-                              return next
-                            })
-                          }}
-                          className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${seleccionada ? 'bg-forest' : 'bg-stone-200'}`}
-                        >
-                          <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${seleccionada ? 'left-5' : 'left-0.5'}`} />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setPlantillasProducto(null)} className="btn-secondary flex-1">Cancelar</button>
-                <button
-                  onClick={handleGuardarPlantillas}
-                  disabled={plantillasSaving || todasPlantillas.length === 0}
-                  className="btn-primary flex-1 flex justify-center gap-2"
-                >
-                  {plantillasSaving && <Spinner className="w-4 h-4 text-cream" />}
-                  Guardar
-                </button>
-              </div>
-            </div>
-          )}
-        </Modal>
-      )}
-
       {/* Import modal */}
       {showImport && (
         <ImportarProductosModal
@@ -713,6 +652,40 @@ export default function ProductosPage() {
                   <button onClick={addRecetaLinea} className="btn-secondary px-3">+</button>
                 </div>
               </div>
+
+              {/* Plantillas */}
+              {todasPlantillas.length > 0 && (
+                <div className="border-t border-stone-100 pt-4">
+                  <p className="text-xs font-medium text-stone-500 mb-2">Plantillas de ingredientes</p>
+                  <div className="space-y-2">
+                    {todasPlantillas.map((pl) => {
+                      const sel = plantillasSeleccionadas.has(pl.id)
+                      return (
+                        <div key={pl.id} className="flex items-center justify-between bg-surface-muted rounded-lg px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-stone-700">{pl.nombre}</p>
+                            {pl.ingredientes.length > 0 && (
+                              <p className="text-xs text-stone-400 truncate">
+                                {pl.ingredientes.map((i) => i.ingredienteNombre).join(', ')}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => setPlantillasSeleccionadas((prev) => {
+                              const next = new Set(prev)
+                              sel ? next.delete(pl.id) : next.add(pl.id)
+                              return next
+                            })}
+                            className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ml-3 ${sel ? 'bg-forest' : 'bg-stone-200'}`}
+                          >
+                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${sel ? 'left-5' : 'left-0.5'}`} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setRecetaProducto(null)} className="btn-secondary flex-1">Cerrar</button>
