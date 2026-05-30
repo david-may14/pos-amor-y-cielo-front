@@ -16,6 +16,7 @@ const UNIDADES = [
   { value: 'ml',    label: 'ml — mililitros' },
   { value: 'L',     label: 'L — litros' },
   { value: 'fl oz', label: 'fl oz — onzas fluidas' },
+  { value: 'shot',  label: 'shot — shot de espresso' },
   { value: 'pz',    label: 'pz — pieza' },
   { value: 'paq',   label: 'paq — paquete' },
 ]
