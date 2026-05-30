@@ -13,6 +13,15 @@ const TABS: { key: Tab; label: string; desc: string }[] = [
 
 export default function InsumosPage() {
   const [tab, setTab] = useState<Tab>('ingredientes')
+  const [tabKeys, setTabKeys] = useState<Record<Tab, number>>({ ingredientes: 0, subrecetas: 0, plantillas: 0 })
+
+  const handleTab = (key: Tab) => {
+    // Re-montar el panel destino para que siempre fetchee datos frescos
+    if (key !== tab) {
+      setTabKeys((prev) => ({ ...prev, [key]: prev[key] + 1 }))
+    }
+    setTab(key)
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -22,7 +31,7 @@ export default function InsumosPage() {
           {TABS.map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setTab(key)}
+              onClick={() => handleTab(key)}
               className={`px-5 py-3.5 text-sm font-medium border-b-2 transition-colors ${
                 tab === key
                   ? 'border-forest text-forest'
@@ -35,15 +44,14 @@ export default function InsumosPage() {
         </div>
       </div>
 
-      {/* Panels — siempre montados para preservar estado al cambiar de tab */}
       <div className={tab === 'ingredientes' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
-        <IngredientesPage />
+        <IngredientesPage key={tabKeys.ingredientes} />
       </div>
       <div className={tab === 'subrecetas' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
-        <SubrecetasPage />
+        <SubrecetasPage key={tabKeys.subrecetas} />
       </div>
       <div className={tab === 'plantillas' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
-        <PlantillasPage />
+        <PlantillasPage key={tabKeys.plantillas} />
       </div>
     </div>
   )
