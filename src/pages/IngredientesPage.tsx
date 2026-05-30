@@ -205,8 +205,8 @@ export default function IngredientesPage() {
     if (!nombre) { setFormError('El nombre es requerido'); return }
     if (!form.unidad) { setFormError('Selecciona una unidad'); return }
 
-    const stockMinimo = parseFloat(form.stockMinimo)
-    const costoUnitario = parseFloat(form.costoUnitario)
+    const stockMinimo = form.stockMinimo === '' ? 0 : parseFloat(form.stockMinimo)
+    const costoUnitario = form.costoUnitario === '' ? 0 : parseFloat(form.costoUnitario)
     if (isNaN(stockMinimo) || stockMinimo < 0) { setFormError('Stock mínimo debe ser ≥ 0'); return }
     if (isNaN(costoUnitario) || costoUnitario < 0) { setFormError('Costo unitario debe ser ≥ 0'); return }
 
