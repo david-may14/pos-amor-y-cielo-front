@@ -67,6 +67,7 @@ export default function IngredientesPage() {
   const [subrecetaSaving, setSubrecetaSaving] = useState(false)
   const [srRendimiento, setSrRendimiento] = useState('')
   const [srLineas, setSrLineas] = useState<{ baseId: string; cantidad: string; merma: string }[]>([{ baseId: '', cantidad: '', merma: '' }])
+  const [srBusqueda, setSrBusqueda] = useState('')
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -576,6 +577,12 @@ export default function IngredientesPage() {
 
                   <div>
                     <label className="label">Ingredientes base</label>
+                    <input
+                      className="input w-full mb-2"
+                      placeholder="Buscar ingrediente…"
+                      value={srBusqueda}
+                      onChange={(e) => setSrBusqueda(e.target.value)}
+                    />
                     <div className="space-y-2">
                       {srLineas.map((linea, i) => (
                         <div key={i} className="flex gap-2 items-center">
@@ -584,9 +591,9 @@ export default function IngredientesPage() {
                             value={linea.baseId}
                             onChange={(e) => setSrLineas(prev => prev.map((l, idx) => idx === i ? { ...l, baseId: e.target.value } : l))}
                           >
-                            <option value="">Seleccionar ingrediente…</option>
+                            <option value="">Seleccionar…</option>
                             {ingredientes
-                              .filter(i2 => i2.id !== subrecetaIng.id)
+                              .filter(i2 => i2.id !== subrecetaIng.id && i2.nombre.toLowerCase().includes(srBusqueda.toLowerCase()))
                               .map(i2 => (
                                 <option key={i2.id} value={i2.id}>{i2.nombre} ({i2.unidad})</option>
                               ))}
@@ -598,14 +605,17 @@ export default function IngredientesPage() {
                             value={linea.cantidad}
                             onChange={(e) => setSrLineas(prev => prev.map((l, idx) => idx === i ? { ...l, cantidad: e.target.value } : l))}
                           />
-                          <input
-                            className="input w-20"
-                            type="number" min="0" max="100" step="0.5"
-                            placeholder="Merma %"
-                            title="% de merma"
-                            value={linea.merma}
-                            onChange={(e) => setSrLineas(prev => prev.map((l, idx) => idx === i ? { ...l, merma: e.target.value } : l))}
-                          />
+                          <div className="relative">
+                            <input
+                              className="input w-20 pr-6"
+                              type="number" min="0" max="100" step="0.5"
+                              placeholder="Merma"
+                              title="% de merma"
+                              value={linea.merma}
+                              onChange={(e) => setSrLineas(prev => prev.map((l, idx) => idx === i ? { ...l, merma: e.target.value } : l))}
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-sm pointer-events-none">%</span>
+                          </div>
                           {srLineas.length > 1 && (
                             <button
                               onClick={() => setSrLineas(prev => prev.filter((_, idx) => idx !== i))}

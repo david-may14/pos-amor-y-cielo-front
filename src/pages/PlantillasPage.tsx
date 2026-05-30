@@ -29,6 +29,7 @@ export default function PlantillasPage() {
   const [ingModal, setIngModal] = useState<PlantillaDTO | null>(null)
   const [ingLineas, setIngLineas] = useState<{ ingredienteId: number; ingredienteNombre: string; unidad: string; cantidad: number; mermaPorcentaje: number }[]>([])
   const [newLinea, setNewLinea] = useState({ ingredienteId: '', cantidad: '', merma: '' })
+  const [busquedaIng, setBusquedaIng] = useState('')
   const [ingSaving, setIngSaving] = useState(false)
   const [ingError, setIngError] = useState('')
   const [ingSuccess, setIngSuccess] = useState(false)
@@ -352,8 +353,14 @@ export default function PlantillasPage() {
               <p className="text-sm text-stone-400 text-center py-4">Sin ingredientes aún</p>
             )}
 
-            <div className="border-t border-stone-100 pt-4">
-              <p className="text-xs font-medium text-stone-500 mb-2">Agregar ingrediente</p>
+            <div className="border-t border-stone-100 pt-4 space-y-2">
+              <p className="text-xs font-medium text-stone-500">Agregar ingrediente</p>
+              <input
+                className="input w-full"
+                placeholder="Buscar ingrediente…"
+                value={busquedaIng}
+                onChange={(e) => setBusquedaIng(e.target.value)}
+              />
               <div className="flex gap-2">
                 <select
                   className="input flex-1"
@@ -362,7 +369,7 @@ export default function PlantillasPage() {
                 >
                   <option value="">Seleccionar…</option>
                   {ingredientes
-                    .filter((i) => !ingLineas.some((l) => l.ingredienteId === i.id))
+                    .filter((i) => !ingLineas.some((l) => l.ingredienteId === i.id) && i.nombre.toLowerCase().includes(busquedaIng.toLowerCase()))
                     .map((i) => (
                       <option key={i.id} value={i.id}>{i.nombre} ({i.unidad})</option>
                     ))}
@@ -375,14 +382,17 @@ export default function PlantillasPage() {
                   onChange={(e) => setNewLinea({ ...newLinea, cantidad: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && addIngLinea()}
                 />
-                <input
-                  className="input w-20"
-                  type="number" min="0" max="100" step="0.5"
-                  placeholder="Merma %"
-                  title="% de merma"
-                  value={newLinea.merma}
-                  onChange={(e) => setNewLinea({ ...newLinea, merma: e.target.value })}
-                />
+                <div className="relative">
+                  <input
+                    className="input w-20 pr-6"
+                    type="number" min="0" max="100" step="0.5"
+                    placeholder="Merma"
+                    title="% de merma"
+                    value={newLinea.merma}
+                    onChange={(e) => setNewLinea({ ...newLinea, merma: e.target.value })}
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-sm pointer-events-none">%</span>
+                </div>
                 <button onClick={addIngLinea} className="btn-secondary px-3">+</button>
               </div>
             </div>

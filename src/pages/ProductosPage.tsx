@@ -54,6 +54,7 @@ export default function ProductosPage() {
   const [recetaError, setRecetaError] = useState('')
   const [recetaSuccess, setRecetaSuccess] = useState(false)
   const [newRecetaLinea, setNewRecetaLinea] = useState({ ingredienteId: '', cantidad: '', merma: '' })
+  const [busquedaIng, setBusquedaIng] = useState('')
 
   const [busqueda, setBusqueda] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
@@ -684,8 +685,14 @@ export default function ProductosPage() {
               )}
 
               {/* Add line */}
-              <div className="border-t border-stone-100 pt-4">
-                <p className="text-xs font-medium text-stone-500 mb-2">Agregar ingrediente</p>
+              <div className="border-t border-stone-100 pt-4 space-y-2">
+                <p className="text-xs font-medium text-stone-500">Agregar ingrediente</p>
+                <input
+                  className="input w-full"
+                  placeholder="Buscar ingrediente…"
+                  value={busquedaIng}
+                  onChange={(e) => setBusquedaIng(e.target.value)}
+                />
                 <div className="flex gap-2">
                   <select
                     className="input flex-1"
@@ -693,9 +700,11 @@ export default function ProductosPage() {
                     onChange={(e) => setNewRecetaLinea({ ...newRecetaLinea, ingredienteId: e.target.value })}
                   >
                     <option value="">Seleccionar…</option>
-                    {ingredientes.map((i) => (
-                      <option key={i.id} value={i.id}>{i.nombre} ({i.unidad})</option>
-                    ))}
+                    {ingredientes
+                      .filter((i) => i.nombre.toLowerCase().includes(busquedaIng.toLowerCase()))
+                      .map((i) => (
+                        <option key={i.id} value={i.id}>{i.nombre} ({i.unidad})</option>
+                      ))}
                   </select>
                   <input
                     className="input w-24"
@@ -704,14 +713,17 @@ export default function ProductosPage() {
                     value={newRecetaLinea.cantidad}
                     onChange={(e) => setNewRecetaLinea({ ...newRecetaLinea, cantidad: e.target.value })}
                   />
-                  <input
-                    className="input w-20"
-                    type="number" min="0" max="100" step="0.5"
-                    placeholder="Merma %"
-                    title="% de merma (ej. 10 = 10% extra de consumo)"
-                    value={newRecetaLinea.merma}
-                    onChange={(e) => setNewRecetaLinea({ ...newRecetaLinea, merma: e.target.value })}
-                  />
+                  <div className="relative">
+                    <input
+                      className="input w-24 pr-7"
+                      type="number" min="0" max="100" step="0.5"
+                      placeholder="Merma"
+                      title="% de merma (ej. 10 = 10% extra de consumo)"
+                      value={newRecetaLinea.merma}
+                      onChange={(e) => setNewRecetaLinea({ ...newRecetaLinea, merma: e.target.value })}
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm pointer-events-none">%</span>
+                  </div>
                   <button onClick={addRecetaLinea} className="btn-secondary px-3">+</button>
                 </div>
               </div>
