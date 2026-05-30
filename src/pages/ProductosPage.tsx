@@ -20,6 +20,7 @@ import { listarIngredientes } from '../api/ingredientes'
 import { listarPlantillas } from '../api/plantillas'
 import type { ProductoDTO, Categoria, RecetaLineaDTO, Ingrediente, ModificadorGrupo, PlantillaDTO, ImportResult } from '../types/api'
 import SearchableSelect from '../components/SearchableSelect'
+import Toast from '../components/Toast'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 import ImportarProductosModal from '../components/ImportarProductosModal'
@@ -53,7 +54,7 @@ export default function ProductosPage() {
   const [ingredientes, setIngredientes] = useState<Ingrediente[]>([])
   const [recetaLoading, setRecetaLoading] = useState(false)
   const [recetaError, setRecetaError] = useState('')
-  const [recetaSuccess, setRecetaSuccess] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
   const [newRecetaLinea, setNewRecetaLinea] = useState({ ingredienteId: '', cantidad: '', merma: '' })
 
   const [busqueda, setBusqueda] = useState('')
@@ -147,7 +148,7 @@ export default function ProductosPage() {
     setRecetaProducto(p)
     setRecetaLoading(true)
     setRecetaError('')
-    setRecetaSuccess(false)
+    
     setNewRecetaLinea({ ingredienteId: '', cantidad: '' })
     try {
       const [r, ings] = await Promise.all([obtenerReceta(p.id), listarIngredientes()])
@@ -177,12 +178,12 @@ export default function ProductosPage() {
     }
     setSaving(true)
     setRecetaError('')
-    setRecetaSuccess(false)
+    
     try {
       const lineas = lineasBase.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad, mermaPorcentaje: l.mermaPorcentaje ?? 0 }))
       const updated = await reemplazarReceta(recetaProducto.id, lineas)
       setReceta(updated)
-      setRecetaSuccess(true)
+      setToastMsg("Receta guardada")
     } catch (e: unknown) {
       setRecetaError(e instanceof Error ? e.message : 'Error al guardar receta')
     } finally {
@@ -654,9 +655,6 @@ export default function ProductosPage() {
               {recetaError && (
                 <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{recetaError}</p>
               )}
-              {recetaSuccess && (
-                <p className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">Receta guardada correctamente</p>
-              )}
               {/* Current recipe */}
               {receta.length > 0 ? (
                 <div className="space-y-2">
@@ -727,6 +725,7 @@ export default function ProductosPage() {
           )}
         </Modal>
       )}
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg('')} />}
     </div>
   )
 }

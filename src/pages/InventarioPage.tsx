@@ -3,6 +3,7 @@ import { listarMovimientos, registrarCompra, registrarAjuste } from '../api/inve
 import { listarIngredientes, obtenerSubreceta, producirIngrediente } from '../api/ingredientes'
 import type { MovimientoInventario, Ingrediente, TipoAjuste, SubrecetaDTO } from '../types/api'
 import Spinner from '../components/Spinner'
+import Toast from '../components/Toast'
 
 type Tab = 'stock' | 'compras' | 'ajustes' | 'produccion' | 'historial'
 
@@ -18,7 +19,7 @@ export default function InventarioPage() {
   const [movimientos, setMovimientos] = useState<MovimientoInventario[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [toastMsg, setToastMsg] = useState('')
   const [busqueda, setBusqueda] = useState('')
 
   // Compras form
@@ -61,7 +62,7 @@ export default function InventarioPage() {
     if (validas.length === 0) { setError('Agrega al menos una línea de compra'); return }
     setSavingCompra(true)
     setError('')
-    setSuccess('')
+    setToastMsg('')
     try {
       await registrarCompra(
         validas.map((l) => ({
@@ -71,7 +72,7 @@ export default function InventarioPage() {
         }))
       )
       setLineas([{ ingredienteId: '', cantidad: '', nota: '' }])
-      setSuccess('Compra registrada correctamente')
+      setToastMsg('Compra registrada correctamente')
       await recargarMovimientos()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al registrar compra')
@@ -84,7 +85,7 @@ export default function InventarioPage() {
     if (!ajuste.ingredienteId || !ajuste.cantidad) { setError('Ingrediente y cantidad son requeridos'); return }
     setSavingAjuste(true)
     setError('')
-    setSuccess('')
+    setToastMsg('')
     try {
       await registrarAjuste({
         ingredienteId: parseInt(ajuste.ingredienteId),
@@ -93,7 +94,7 @@ export default function InventarioPage() {
         ...(ajuste.nota ? { nota: ajuste.nota } : {}),
       })
       setAjuste({ ingredienteId: '', cantidad: '', tipo: 'AJUSTE', nota: '' })
-      setSuccess('Ajuste registrado correctamente')
+      setToastMsg('Ajuste registrado correctamente')
       await recargarMovimientos()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al registrar ajuste')
@@ -120,7 +121,7 @@ export default function InventarioPage() {
     if (isNaN(lotes) || lotes <= 0) { setError('Los lotes deben ser > 0'); return }
     setSavingProd(true)
     setError('')
-    setSuccess('')
+    setToastMsg('')
     try {
       await producirIngrediente(parseInt(prodIngId), lotes)
       const ings = await listarIngredientes()
@@ -128,7 +129,7 @@ export default function InventarioPage() {
       setProdIngId('')
       setProdLotes('1')
       setProdSubreceta(null)
-      setSuccess(`Producción registrada correctamente`)
+      setToastMsg('Producción registrada correctamente')
       await recargarMovimientos()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al registrar producción')
@@ -162,7 +163,7 @@ export default function InventarioPage() {
         {([['stock', 'Stock'], ['compras', 'Compras'], ['ajustes', 'Ajustes'], ['produccion', 'Producción'], ['historial', 'Historial']] as [Tab, string][]).map(([t, label]) => (
           <button
             key={t}
-            onClick={() => { setTab(t); setError(''); setSuccess('') }}
+            onClick={() => { setTab(t); setError(''); setToastMsg('') }}
             className={`px-5 py-2 text-sm font-medium rounded-lg transition-colors ${
               tab === t ? 'bg-white text-forest shadow-sm' : 'text-stone-500 hover:text-stone-700'
             }`}
@@ -175,9 +176,7 @@ export default function InventarioPage() {
       {error && (
         <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-5">{error}</div>
       )}
-      {success && (
-        <div className="bg-green-50 text-green-700 text-sm rounded-lg px-4 py-3 mb-5">{success}</div>
-      )}
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg('')} />}
 
       {/* Stock actual */}
       {tab === 'stock' && (

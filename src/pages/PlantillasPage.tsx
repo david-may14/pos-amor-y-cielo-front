@@ -12,6 +12,7 @@ import type { PlantillaDTO, Ingrediente } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 import SearchableSelect from '../components/SearchableSelect'
+import Toast from '../components/Toast'
 
 export default function PlantillasPage() {
   const [plantillas, setPlantillas] = useState<PlantillaDTO[]>([])
@@ -32,7 +33,7 @@ export default function PlantillasPage() {
   const [newLinea, setNewLinea] = useState({ ingredienteId: '', cantidad: '', merma: '' })
   const [ingSaving, setIngSaving] = useState(false)
   const [ingError, setIngError] = useState('')
-  const [ingSuccess, setIngSuccess] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
 
   const [toggling, setToggling] = useState<number | null>(null)
 
@@ -119,7 +120,7 @@ export default function PlantillasPage() {
     })))
     setNewLinea({ ingredienteId: '', cantidad: '', merma: '' })
     setIngError('')
-    setIngSuccess(false)
+    
   }
 
   const addIngLinea = () => {
@@ -152,7 +153,7 @@ export default function PlantillasPage() {
 
     setIngSaving(true)
     setIngError('')
-    setIngSuccess(false)
+    
     try {
       const updated = await reemplazarIngredientes(
         ingModal.id,
@@ -160,7 +161,7 @@ export default function PlantillasPage() {
       )
       setPlantillas((prev) => prev.map((p) => p.id === ingModal.id ? updated : p))
       setIngModal(updated)
-      setIngSuccess(true)
+      setToastMsg("Ingredientes guardados")
     } catch (e: unknown) {
       setIngError(e instanceof Error ? e.message : 'Error al guardar')
     } finally {
@@ -316,9 +317,7 @@ export default function PlantillasPage() {
             {ingError && (
               <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{ingError}</p>
             )}
-            {ingSuccess && (
-              <p className="text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg">Ingredientes guardados correctamente</p>
-            )}
+
 
             <p className="text-xs text-stone-400">
               Estos ingredientes se descontarán del inventario automáticamente al vender cualquier producto que use esta plantilla.
@@ -401,6 +400,7 @@ export default function PlantillasPage() {
           </div>
         </Modal>
       )}
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg('')} />}
     </div>
   )
 }

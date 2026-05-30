@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { obtenerConfiguracion, actualizarConfiguracion } from '../api/configuracion'
 import Spinner from '../components/Spinner'
+import Toast from '../components/Toast'
 
 export default function ConfiguracionPage() {
   const [iva, setIva] = useState('')
   const [comision, setComision] = useState('')
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
-  const [exito, setExito] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -33,13 +34,11 @@ export default function ConfiguracionPage() {
     }
     setGuardando(true)
     setError('')
-    setExito(false)
     try {
       const res = await actualizarConfiguracion({ ivaPorcentaje: ivaNum, comisionTarjeta: comisionNum })
       setIva(String(res.ivaPorcentaje))
       setComision(String(res.comisionTarjeta))
-      setExito(true)
-      setTimeout(() => setExito(false), 3000)
+      setToastMsg('Configuración guardada')
     } catch {
       setError('Error al guardar la configuración')
     } finally {
@@ -65,11 +64,7 @@ export default function ConfiguracionPage() {
       {error && (
         <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-5">{error}</div>
       )}
-      {exito && (
-        <div className="bg-green-50 text-green-700 text-sm rounded-lg px-4 py-3 mb-5">
-          Configuración guardada correctamente.
-        </div>
-      )}
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg('')} />}
 
       <div className="card px-6 py-6 space-y-6">
         {/* IVA */}
