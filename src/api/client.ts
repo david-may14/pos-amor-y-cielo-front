@@ -24,7 +24,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(text || `Error ${res.status}`)
+    let msg = text
+    try {
+      const json = JSON.parse(text)
+      msg = json.message || json.error || text
+    } catch { /* not JSON, use raw text */ }
+    throw new Error(msg || `Error ${res.status}`)
   }
 
   if (res.status === 204) return null as T

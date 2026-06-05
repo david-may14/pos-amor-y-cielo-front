@@ -16,6 +16,9 @@ export const toggleActivoPlantilla = (id: number) =>
 export const eliminarPlantilla = (id: number) =>
   api.delete<null>(`/api/plantillas/${id}`)
 
+export const duplicarPlantilla = (id: number, nombre: string) =>
+  api.post<PlantillaDTO>(`/api/plantillas/${id}/duplicar`, { nombre })
+
 export const reemplazarIngredientes = (
   id: number,
   lineas: { ingredienteId: number; cantidad: number }[]

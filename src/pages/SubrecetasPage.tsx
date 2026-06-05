@@ -103,11 +103,9 @@ export default function SubrecetasPage() {
     try {
       await guardarSubreceta(subrecetaIng.id, {
         rendimientoLote: rendimiento,
-        lineas: lineasValidas.map((l) => ({ baseId: parseInt(l.baseId), cantidad: parseFloat(l.cantidad) })),
+        lineas: lineasValidas.map((l) => ({ baseId: parseInt(l.baseId), cantidad: parseFloat(l.cantidad), mermaPorcentaje: 0 })),
       })
-      setIngredientes((prev) =>
-        prev.map((i) => i.id === subrecetaIng.id ? { ...i, rendimientoLote: rendimiento } : i)
-      )
+      await cargar()
       setShowModal(false)
     } catch (e: unknown) {
       setSubrecetaError(e instanceof Error ? e.message : 'Error al guardar')
@@ -121,9 +119,7 @@ export default function SubrecetasPage() {
     setSubrecetaSaving(true)
     try {
       await eliminarSubreceta(subrecetaIng.id)
-      setIngredientes((prev) =>
-        prev.map((i) => i.id === subrecetaIng.id ? { ...i, rendimientoLote: null } : i)
-      )
+      await cargar()
       setShowModal(false)
     } catch (e: unknown) {
       setSubrecetaError(e instanceof Error ? e.message : 'Error al eliminar')

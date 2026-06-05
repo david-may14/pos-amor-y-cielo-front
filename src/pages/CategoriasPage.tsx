@@ -171,7 +171,7 @@ export default function CategoriasPage() {
   }
 
   const handleEliminar = async (c: Categoria) => {
-    if (!confirm(`¿Eliminar la categoría "${c.nombre}"? Los productos quedarán sin categoría.`)) return
+    if (!confirm(`¿Eliminar la categoría "${c.nombre}"?`)) return
     try {
       await eliminarCategoria(c.id)
       setCategorias((prev) => prev.filter((x) => x.id !== c.id))

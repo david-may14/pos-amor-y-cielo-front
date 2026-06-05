@@ -59,12 +59,51 @@ export interface ProductoDTO {
   costo: number
   categoria: string
   disponible: boolean
+  tieneReceta: boolean
+  recetaVencida: boolean
+  recetaRevisadaEn: string | null
+  margenSeguridad: number | null
 }
 export interface ProductoRequest {
   nombre: string
   precioVenta: number
   costo?: number
   categoriaId?: number
+  margenSeguridad?: number | null
+}
+
+// ─── Costeo ───────────────────────────────────────────────────────────────────
+export interface LineaCosteo {
+  nombre: string
+  unidad: string
+  cantidad: number
+  mermaPorcentaje: number
+  costoUnitario: number
+  costoLinea: number
+}
+export interface PlantillaCosteo {
+  nombre: string
+  ingredientes: LineaCosteo[]
+  costoPlantilla: number
+}
+export interface SnapshotCosteo {
+  fecha: string
+  costoTotal: number
+  precioVenta: number
+}
+export interface CosteoDTO {
+  productoId: number
+  nombre: string
+  categoria: string | null
+  precioVenta: number
+  costoTotal: number
+  margen: number
+  margenPorcentaje: number
+  margenSeguridad: number | null
+  costoConMargen: number | null
+  ingredientesDirectos: LineaCosteo[]
+  plantillas: PlantillaCosteo[]
+  historial: SnapshotCosteo[]
 }
 
 // ─── Import/Export ────────────────────────────────────────────────────────────
@@ -110,6 +149,7 @@ export interface Ingrediente {
   stockActual: number
   stockMinimo: number
   costoUnitario: number
+  margenSeguridad: number | null
   rendimientoLote: number | null
   marca?: string | null
   proveedor?: string | null
@@ -124,6 +164,17 @@ export interface IngredienteRequest {
   stockMinimo: number
   costoUnitario: number
   stockInicial?: number
+  margenSeguridad?: number | null
+}
+export interface AlertaStockDTO {
+  id: number
+  nombre: string
+  unidad: string
+  stockActual: number
+  stockMinimo: number
+  margenSeguridad: number | null
+  umbralSeguridad: number
+  nivel: 'CRITICO' | 'ADVERTENCIA'
 }
 export interface IngredientePrecioDTO {
   id: number
@@ -286,6 +337,7 @@ export interface TurnoDTO {
 export interface ConfiguracionDTO {
   ivaPorcentaje: number
   comisionTarjeta: number
+  diasRevisionReceta: number
 }
 
 // ─── Ventas ───────────────────────────────────────────────────────────────────

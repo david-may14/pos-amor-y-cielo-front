@@ -33,9 +33,10 @@ interface ProductoForm {
   precioVenta: string
   costo: string
   categoriaId: string
+  margenSeguridad: string
 }
 
-const emptyForm: ProductoForm = { nombre: '', precioVenta: '', costo: '', categoriaId: '' }
+const emptyForm: ProductoForm = { nombre: '', precioVenta: '', costo: '', categoriaId: '', margenSeguridad: '' }
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState<ProductoDTO[]>([])
@@ -78,6 +79,7 @@ export default function ProductosPage() {
   const [plantillasSaving, setPlantillasSaving] = useState(false)
   const [plantillasError, setPlantillasError] = useState('')
   const [plantillasExpandidas, setPlantillasExpandidas] = useState<Set<number>>(new Set())
+  const [plantillasSectionVisible, setPlantillasSectionVisible] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -104,7 +106,7 @@ export default function ProductosPage() {
   const openEdit = (p: ProductoDTO) => {
     setEditing(p)
     const cat = categorias.find((c) => c.nombre === p.categoria)
-    setForm({ nombre: p.nombre, precioVenta: String(p.precioVenta), costo: String(p.costo ?? 0), categoriaId: cat ? String(cat.id) : '' })
+    setForm({ nombre: p.nombre, precioVenta: String(p.precioVenta), costo: String(p.costo ?? 0), categoriaId: cat ? String(cat.id) : '', margenSeguridad: p.margenSeguridad != null ? String(p.margenSeguridad) : '' })
     setFormError('')
     setShowForm(true)
   }
@@ -119,6 +121,7 @@ export default function ProductosPage() {
         precioVenta: parseFloat(form.precioVenta),
         costo: parseFloat(form.costo) || 0,
         ...(form.categoriaId ? { categoriaId: parseInt(form.categoriaId) } : {}),
+        margenSeguridad: form.margenSeguridad !== '' ? parseFloat(form.margenSeguridad) : null,
       }
       if (editing) {
         const updated = await actualizarProducto(editing.id, data)
@@ -150,6 +153,7 @@ export default function ProductosPage() {
     setRecetaLoading(true)
     setRecetaError('')
     setNewRecetaLinea({ ingredienteId: '', cantidad: '', merma: '' })
+    setPlantillasSectionVisible(false)
     try {
       const [r, ings, todas, actuales] = await Promise.all([
         obtenerReceta(p.id),
@@ -183,9 +187,14 @@ export default function ProductosPage() {
         setNewRecetaLinea({ ingredienteId: '', cantidad: '', merma: '' })
       }
     }
+    const plantillasActivas = plantillasSeleccionadas.size
+    if (lineasBase.length === 0 && plantillasActivas === 0) {
+      setRecetaError('Agrega al menos un ingrediente o una plantilla antes de guardar')
+      return
+    }
     setSaving(true)
     setRecetaError('')
-    
+
     try {
       const lineas = lineasBase.map((l) => ({ ingredienteId: l.ingredienteId, cantidad: l.cantidad, mermaPorcentaje: l.mermaPorcentaje ?? 0 }))
       const [updated] = await Promise.all([
@@ -193,6 +202,8 @@ export default function ProductosPage() {
         asignarPlantillasProducto(recetaProducto.id, [...plantillasSeleccionadas]),
       ])
       setReceta(updated)
+      await cargar()
+      setRecetaProducto(null)
       setToastMsg("Receta guardada")
     } catch (e: unknown) {
       setRecetaError(e instanceof Error ? e.message : 'Error al guardar receta')
@@ -423,6 +434,23 @@ export default function ProductosPage() {
                 <td className="px-5 py-3 text-right text-stone-500 text-xs">{p.costo > 0 ? fmt(p.costo) : '—'}</td>
                 <td className="px-5 py-3 text-right">
                   <div className="flex items-center justify-end gap-3">
+                    {!p.tieneReceta && (
+                      <span className="text-xs text-amber-500 flex items-center gap-1" title="Este producto no tiene receta asignada">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                        Sin receta
+                      </span>
+                    )}
+                    {p.tieneReceta && p.recetaVencida && (
+                      <span className="text-xs text-orange-500 flex items-center gap-1"
+                        title={`Receta sin revisar${p.recetaRevisadaEn ? ` desde ${p.recetaRevisadaEn}` : ''} — los costos pueden haber cambiado`}>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                        Revisar costos
+                      </span>
+                    )}
                     <button
                       onClick={() => handleToggleDisponibilidad(p)}
                       disabled={togglingDisp === p.id}
@@ -494,6 +522,28 @@ export default function ProductosPage() {
                 />
                 <p className="text-xs text-stone-400 mt-1">La receta tiene prioridad si existe</p>
               </div>
+            </div>
+            <div>
+              <label className="label">Margen de seguridad % <span className="text-stone-400 font-normal">(opcional)</span></label>
+              <div className="relative">
+                <input
+                  className="input pr-7"
+                  type="number"
+                  min="0"
+                  max="99"
+                  step="0.5"
+                  value={form.margenSeguridad}
+                  onChange={(e) => setForm({ ...form, margenSeguridad: e.target.value })}
+                  placeholder="Ej. 60"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 text-sm pointer-events-none">%</span>
+              </div>
+              <p className="text-xs text-stone-400 mt-1">
+                Protege ante subidas de costo. Precio sugerido = costo ÷ (1 - margen%).
+                {form.margenSeguridad && form.costo && parseFloat(form.margenSeguridad) > 0 && parseFloat(form.costo) > 0 && (
+                  <span className="text-forest font-medium"> Sugerido: {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(parseFloat(form.costo) / (1 - parseFloat(form.margenSeguridad) / 100))}</span>
+                )}
+              </p>
             </div>
             <div>
               <label className="label">Categoría (opcional)</label>
@@ -687,8 +737,23 @@ export default function ProductosPage() {
               {/* Plantillas */}
               {todasPlantillas.length > 0 && (
                 <div className="border-t border-stone-100 pt-4">
-                  <p className="text-xs font-medium text-stone-500 mb-2">Plantillas de ingredientes</p>
-                  <div className="space-y-2">
+                  <button
+                    onClick={() => setPlantillasSectionVisible(prev => !prev)}
+                    className="w-full flex items-center justify-between mb-2 group"
+                  >
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-stone-500">
+                      Plantillas de ingredientes
+                      {plantillasSeleccionadas.size > 0 && (
+                        <span className="bg-forest text-cream px-1.5 py-0.5 rounded-full text-[10px]">
+                          {plantillasSeleccionadas.size} activa{plantillasSeleccionadas.size !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </span>
+                    <svg className={`w-3.5 h-3.5 text-stone-400 transition-transform ${plantillasSectionVisible ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+                    </svg>
+                  </button>
+                  {plantillasSectionVisible && <div className="space-y-2">
                     {todasPlantillas.map((pl) => {
                       const sel = plantillasSeleccionadas.has(pl.id)
                       const exp = plantillasExpandidas.has(pl.id)
@@ -753,7 +818,7 @@ export default function ProductosPage() {
                         </div>
                       )
                     })}
-                  </div>
+                  </div>}
                 </div>
               )}
 

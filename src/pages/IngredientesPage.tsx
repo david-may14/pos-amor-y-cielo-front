@@ -28,6 +28,7 @@ interface IngredienteForm {
   stockActual: string   // solo al editar
   stockMinimo: string
   costoUnitario: string
+  margenSeguridad: string
 }
 
 const emptyForm = (): IngredienteForm => ({
@@ -37,6 +38,7 @@ const emptyForm = (): IngredienteForm => ({
   stockActual: '',
   stockMinimo: '',
   costoUnitario: '',
+  margenSeguridad: '',
 })
 
 const fmt = (n: number) =>
@@ -150,7 +152,7 @@ export default function IngredientesPage() {
         rendimientoLote: rendimiento,
         lineas: lineasValidas.map(l => ({ baseId: parseInt(l.baseId), cantidad: parseFloat(l.cantidad), mermaPorcentaje: parseFloat(l.merma) || 0 })),
       })
-      setIngredientes(prev => prev.map(i => i.id === subrecetaIng.id ? { ...i, rendimientoLote: rendimiento } : i))
+      await cargar()
       setShowSubreceta(false)
     } catch (e: unknown) {
       setSubrecetaError(e instanceof Error ? e.message : 'Error al guardar')
@@ -164,7 +166,7 @@ export default function IngredientesPage() {
     setSubrecetaSaving(true)
     try {
       await eliminarSubreceta(subrecetaIng.id)
-      setIngredientes(prev => prev.map(i => i.id === subrecetaIng.id ? { ...i, rendimientoLote: null } : i))
+      await cargar()
       setShowSubreceta(false)
     } catch (e: unknown) {
       setSubrecetaError(e instanceof Error ? e.message : 'Error al eliminar')
@@ -177,7 +179,13 @@ export default function IngredientesPage() {
     ? ingredientes.filter((i) => i.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
     : ingredientes
 
-  const stockBajos = ingredientes.filter((i) => i.stockActual <= i.stockMinimo)
+  const stockCriticos = ingredientes.filter((i) => i.stockActual <= i.stockMinimo)
+  const stockAdvertencia = ingredientes.filter((i) => {
+    if (i.stockActual <= i.stockMinimo) return false
+    if (i.margenSeguridad == null || i.margenSeguridad <= 0) return false
+    const umbral = i.stockMinimo * (1 + i.margenSeguridad / 100)
+    return i.stockActual <= umbral
+  })
 
   const openCreate = () => {
     setEditing(null)
@@ -195,6 +203,7 @@ export default function IngredientesPage() {
       stockActual: String(ing.stockActual),
       stockMinimo: String(ing.stockMinimo),
       costoUnitario: String(ing.costoUnitario),
+      margenSeguridad: ing.margenSeguridad != null ? String(ing.margenSeguridad) : '',
     })
     setFormError('')
     setShowForm(true)
@@ -210,6 +219,11 @@ export default function IngredientesPage() {
     if (isNaN(stockMinimo) || stockMinimo < 0) { setFormError('Stock mínimo debe ser ≥ 0'); return }
     if (isNaN(costoUnitario) || costoUnitario < 0) { setFormError('Costo unitario debe ser ≥ 0'); return }
 
+    const margenSeguridad = form.margenSeguridad !== '' ? parseFloat(form.margenSeguridad) : null
+    if (margenSeguridad !== null && (isNaN(margenSeguridad) || margenSeguridad < 0 || margenSeguridad >= 100)) {
+      setFormError('Margen de seguridad debe ser entre 0 y 99'); return
+    }
+
     setSaving(true)
     setFormError('')
     try {
@@ -221,14 +235,14 @@ export default function IngredientesPage() {
           await registrarAjuste({ ingredienteId: editing.id, cantidad: delta, tipo: 'AJUSTE', nota: 'Corrección de stock' })
         }
         const updated = await actualizarIngrediente(editing.id, {
-          nombre, unidad: form.unidad, stockMinimo, costoUnitario,
+          nombre, unidad: form.unidad, stockMinimo, costoUnitario, margenSeguridad,
         })
         setIngredientes((prev) => prev.map((i) => i.id === editing.id ? { ...updated, stockActual: nuevoStock } : i))
       } else {
         const stockInicial = form.stockInicial !== '' ? parseFloat(form.stockInicial) : 0
         if (isNaN(stockInicial) || stockInicial < 0) { setFormError('Stock inicial debe ser ≥ 0'); setSaving(false); return }
         const created = await crearIngrediente({
-          nombre, unidad: form.unidad, stockMinimo, costoUnitario, stockInicial,
+          nombre, unidad: form.unidad, stockMinimo, costoUnitario, stockInicial, margenSeguridad,
         })
         setIngredientes((prev) => [...prev, created])
       }
@@ -308,17 +322,35 @@ export default function IngredientesPage() {
         )}
       </div>
 
-      {stockBajos.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-5">
-          <p className="text-sm font-medium text-amber-800 mb-2">
-            ⚠ {stockBajos.length} ingrediente{stockBajos.length > 1 ? 's' : ''} con stock bajo
+      {stockCriticos.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 mb-3">
+          <p className="text-sm font-medium text-red-800 mb-2">
+            🔴 {stockCriticos.length} ingrediente{stockCriticos.length > 1 ? 's' : ''} en stock crítico
           </p>
           <div className="flex flex-wrap gap-2">
-            {stockBajos.map((i) => (
-              <span key={i.id} className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-md">
+            {stockCriticos.map((i) => (
+              <span key={i.id} className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-md">
                 {i.nombre} — {i.stockActual} {i.unidad}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {stockAdvertencia.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-3">
+          <p className="text-sm font-medium text-amber-800 mb-2">
+            ⚠ {stockAdvertencia.length} ingrediente{stockAdvertencia.length > 1 ? 's' : ''} en zona de advertencia
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {stockAdvertencia.map((i) => {
+              const umbral = i.stockMinimo * (1 + (i.margenSeguridad ?? 0) / 100)
+              return (
+                <span key={i.id} className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-md">
+                  {i.nombre} — {i.stockActual} {i.unidad} (umbral: {umbral.toFixed(2)})
+                </span>
+              )
+            })}
           </div>
         </div>
       )}
@@ -352,18 +384,21 @@ export default function IngredientesPage() {
               </tr>
             )}
             {ingredientesFiltrados.map((ing) => {
-              const bajo = ing.stockActual <= ing.stockMinimo
+              const critico = ing.stockActual <= ing.stockMinimo
+              const advertencia = !critico && ing.margenSeguridad != null && ing.margenSeguridad > 0 &&
+                ing.stockActual <= ing.stockMinimo * (1 + ing.margenSeguridad / 100)
               return (
-                <tr key={ing.id} className={`hover:bg-surface-muted/50 ${bajo ? 'bg-amber-50/50' : ''}`}>
+                <tr key={ing.id} className={`hover:bg-surface-muted/50 ${critico ? 'bg-red-50/40' : advertencia ? 'bg-amber-50/40' : ''}`}>
                   <td className="px-5 py-3 font-medium text-stone-800">
                     {ing.nombre}
-                    {bajo && <span className="ml-2 text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">bajo</span>}
+                    {critico && <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">crítico</span>}
+                    {advertencia && <span className="ml-2 text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">advertencia</span>}
                     {ing.rendimientoLote != null && <span className="ml-2 text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">elaborado</span>}
                     {ing.marca && <span className="ml-1 text-xs text-stone-400">{ing.marca}</span>}
                   </td>
                   <td className="px-5 py-3 text-stone-500">{unidadLabel(ing.unidad)}</td>
                   <td className="px-5 py-3 text-stone-400 text-xs">{ing.proveedor || '—'}</td>
-                  <td className={`px-5 py-3 text-right font-semibold ${bajo ? 'text-amber-600' : 'text-stone-700'}`}>
+                  <td className={`px-5 py-3 text-right font-semibold ${critico ? 'text-red-600' : advertencia ? 'text-amber-600' : 'text-stone-700'}`}>
                     {ing.stockActual} {ing.unidad}
                   </td>
                   <td className="px-5 py-3 text-right text-stone-400">{ing.stockMinimo} {ing.unidad}</td>
@@ -499,6 +534,34 @@ export default function IngredientesPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            <div>
+              <label className="label">
+                Margen de seguridad %{' '}
+                <span className="text-stone-400 font-normal">(opcional)</span>
+              </label>
+              <div className="relative">
+                <input
+                  className="input pr-8"
+                  type="number"
+                  min="0"
+                  max="99"
+                  step="0.5"
+                  value={form.margenSeguridad}
+                  onChange={(e) => setForm({ ...form, margenSeguridad: e.target.value })}
+                  placeholder="Ej. 20"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm pointer-events-none">%</span>
+              </div>
+              <p className="text-xs text-stone-400 mt-1">
+                Zona de advertencia antes del mínimo crítico.
+                {form.margenSeguridad && form.stockMinimo && parseFloat(form.margenSeguridad) > 0 && parseFloat(form.stockMinimo) > 0 && (
+                  <span className="text-amber-600 font-medium">
+                    {' '}Umbral: {(parseFloat(form.stockMinimo) * (1 + parseFloat(form.margenSeguridad) / 100)).toFixed(2)} {form.unidad}
+                  </span>
+                )}
+              </p>
             </div>
 
             {!editing && form.unidad && form.costoUnitario && parseFloat(form.costoUnitario) > 0 && (

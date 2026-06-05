@@ -1,5 +1,8 @@
 import { api } from './client'
-import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, ModificadorGrupo, PlantillaDTO, ImportPreviewResult, ImportResult } from '../types/api'
+import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, ModificadorGrupo, PlantillaDTO, ImportPreviewResult, ImportResult, CosteoDTO } from '../types/api'
+
+export const listarCosteo = () => api.get<CosteoDTO[]>('/api/productos/costeo')
+export const detalleCosteo = (id: number) => api.get<CosteoDTO>(`/api/productos/${id}/costeo`)
 
 export const listarProductos = () => api.get<ProductoDTO[]>('/api/productos')
 
@@ -29,6 +32,12 @@ export const quitarModificador = (productoId: number, grupoId: number) =>
 
 export const toggleDisponibilidad = (id: number) =>
   api.patch<ProductoDTO>(`/api/productos/${id}/disponibilidad`, {})
+
+export const actualizarMargenSeguridad = (id: number, margenSeguridad: number | null) =>
+  api.patch<ProductoDTO>(`/api/productos/${id}/margen-seguridad`, { margenSeguridad })
+
+export const actualizarPrecioProducto = (id: number, precioVenta: number) =>
+  api.patch<ProductoDTO>(`/api/productos/${id}/precio`, { precioVenta })
 
 export const listarPlantillasProducto = (id: number) =>
   api.get<PlantillaDTO[]>(`/api/productos/${id}/plantillas`)

@@ -6,6 +6,7 @@ import {
   toggleActivoPlantilla,
   eliminarPlantilla,
   reemplazarIngredientes,
+  duplicarPlantilla,
 } from '../api/plantillas'
 import { listarIngredientes } from '../api/ingredientes'
 import type { PlantillaDTO, Ingrediente } from '../types/api'
@@ -36,6 +37,12 @@ export default function PlantillasPage() {
   const [toastMsg, setToastMsg] = useState('')
 
   const [toggling, setToggling] = useState<number | null>(null)
+
+  // Modal duplicar
+  const [duplicateSource, setDuplicateSource] = useState<PlantillaDTO | null>(null)
+  const [duplicateNombre, setDuplicateNombre] = useState('')
+  const [duplicateSaving, setDuplicateSaving] = useState(false)
+  const [duplicateError, setDuplicateError] = useState('')
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -169,6 +176,29 @@ export default function PlantillasPage() {
     }
   }
 
+  const openDuplicar = (p: PlantillaDTO) => {
+    setDuplicateSource(p)
+    setDuplicateNombre(`Copia de ${p.nombre}`)
+    setDuplicateError('')
+  }
+
+  const handleDuplicar = async () => {
+    if (!duplicateSource) return
+    if (!duplicateNombre.trim()) { setDuplicateError('El nombre es requerido'); return }
+    setDuplicateSaving(true)
+    setDuplicateError('')
+    try {
+      const nueva = await duplicarPlantilla(duplicateSource.id, duplicateNombre.trim())
+      setPlantillas((prev) => [...prev, nueva])
+      setDuplicateSource(null)
+      setToastMsg(`Plantilla "${nueva.nombre}" creada`)
+    } catch (e: unknown) {
+      setDuplicateError(e instanceof Error ? e.message : 'Error al duplicar')
+    } finally {
+      setDuplicateSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -252,6 +282,13 @@ export default function PlantillasPage() {
                         className="text-xs text-stone-400 hover:text-forest transition-colors"
                       >
                         Ingredientes
+                      </button>
+                      <button
+                        onClick={() => openDuplicar(p)}
+                        className="text-xs text-stone-400 hover:text-forest transition-colors"
+                        title="Duplicar plantilla"
+                      >
+                        Duplicar
                       </button>
                       <button
                         onClick={() => openEdit(p)}
@@ -400,6 +437,37 @@ export default function PlantillasPage() {
           </div>
         </Modal>
       )}
+      {/* Modal duplicar */}
+      {duplicateSource && (
+        <Modal title={`Duplicar — ${duplicateSource.nombre}`} onClose={() => setDuplicateSource(null)}>
+          <div className="space-y-4">
+            {duplicateError && (
+              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{duplicateError}</p>
+            )}
+            <p className="text-sm text-stone-500">
+              Se creará una copia de <span className="font-medium text-stone-700">{duplicateSource.nombre}</span> con todos sus ingredientes ({duplicateSource.ingredientes.length}).
+            </p>
+            <div>
+              <label className="label">Nombre de la nueva plantilla</label>
+              <input
+                className="input"
+                value={duplicateNombre}
+                onChange={(e) => setDuplicateNombre(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleDuplicar()}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setDuplicateSource(null)} className="btn-secondary flex-1">Cancelar</button>
+              <button onClick={handleDuplicar} disabled={duplicateSaving} className="btn-primary flex-1 flex justify-center gap-2">
+                {duplicateSaving && <Spinner className="w-4 h-4 text-cream" />}
+                {duplicateSaving ? 'Duplicando…' : 'Duplicar'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg('')} />}
     </div>
   )

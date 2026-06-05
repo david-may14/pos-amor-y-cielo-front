@@ -18,6 +18,7 @@ import TicketsPage from './pages/TicketsPage'
 import PlantillasPage from './pages/PlantillasPage'
 import InsumosPage from './pages/InsumosPage'
 import EquilibrioPage from './pages/EquilibrioPage'
+import CosteoPage from './pages/CosteoPage'
 
 function RequireAuth() {
   const { user } = useAuth()
@@ -55,6 +56,7 @@ export default function App() {
             <Route path="/descuentos" element={<DescuentosPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
             <Route path="/equilibrio" element={<EquilibrioPage />} />
+            <Route path="/costeo" element={<CosteoPage />} />
           </Route>
         </Route>
       </Route>

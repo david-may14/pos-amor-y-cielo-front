@@ -1,9 +1,11 @@
 import { api } from './client'
-import type { Ingrediente, IngredienteRequest, SubrecetaDTO, SubrecetaRequest, IngredientePrecioDTO, AgregarPrecioRequest, IngPreviewResult, IngImportResult } from '../types/api'
+import type { Ingrediente, IngredienteRequest, AlertaStockDTO, SubrecetaDTO, SubrecetaRequest, IngredientePrecioDTO, AgregarPrecioRequest, IngPreviewResult, IngImportResult } from '../types/api'
 
 export const listarIngredientes = () => api.get<Ingrediente[]>('/api/ingredientes')
 
 export const stockBajo = () => api.get<Ingrediente[]>('/api/ingredientes/stock-bajo')
+
+export const alertasStock = () => api.get<AlertaStockDTO[]>('/api/ingredientes/alertas-stock')
 
 export const crearIngrediente = (data: IngredienteRequest) =>
   api.post<Ingrediente>('/api/ingredientes', data)

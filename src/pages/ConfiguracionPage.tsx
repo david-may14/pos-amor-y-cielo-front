@@ -6,6 +6,7 @@ import Toast from '../components/Toast'
 export default function ConfiguracionPage() {
   const [iva, setIva] = useState('')
   const [comision, setComision] = useState('')
+  const [diasRevision, setDiasRevision] = useState('30')
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
@@ -16,6 +17,7 @@ export default function ConfiguracionPage() {
       .then((c) => {
         setIva(String(c.ivaPorcentaje))
         setComision(String(c.comisionTarjeta))
+        setDiasRevision(String(c.diasRevisionReceta ?? 30))
       })
       .catch(() => setError('No se pudo cargar la configuración'))
       .finally(() => setLoading(false))
@@ -35,9 +37,11 @@ export default function ConfiguracionPage() {
     setGuardando(true)
     setError('')
     try {
-      const res = await actualizarConfiguracion({ ivaPorcentaje: ivaNum, comisionTarjeta: comisionNum })
+      const dias = parseInt(diasRevision) || 30
+      const res = await actualizarConfiguracion({ ivaPorcentaje: ivaNum, comisionTarjeta: comisionNum, diasRevisionReceta: dias })
       setIva(String(res.ivaPorcentaje))
       setComision(String(res.comisionTarjeta))
+      setDiasRevision(String(res.diasRevisionReceta))
       setToastMsg('Configuración guardada')
     } catch {
       setError('Error al guardar la configuración')
@@ -94,6 +98,29 @@ export default function ConfiguracionPage() {
               </span>
             </p>
           )}
+        </div>
+
+        <div className="border-t border-stone-100" />
+
+        {/* Días revisión receta */}
+        <div>
+          <label className="label">Días máximos sin revisar costos de receta</label>
+          <p className="text-xs text-stone-400 mb-2">
+            Los productos cuya receta no se haya guardado en este período mostrarán una alerta
+            "Revisar costos" para que actualices los precios de ingredientes.
+          </p>
+          <div className="relative max-w-xs">
+            <input
+              className="input pr-16"
+              type="number"
+              min={1}
+              max={365}
+              step={1}
+              value={diasRevision}
+              onChange={(e) => setDiasRevision(e.target.value)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 text-sm">días</span>
+          </div>
         </div>
 
         <div className="border-t border-stone-100" />
