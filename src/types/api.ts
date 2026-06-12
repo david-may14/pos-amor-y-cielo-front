@@ -372,6 +372,8 @@ export interface VentaResponse {
   descuentoTicketNombre?: string | null
   descuentoTicketMonto?: number | null
   splitGrupo?: string | null
+  usuarioId?: number | null
+  usuarioNombre?: string | null
 }
 export interface ResumenDia {
   fecha: string

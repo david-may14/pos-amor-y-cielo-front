@@ -145,6 +145,54 @@ export default function VentasPage() {
             </div>
           )}
 
+          {/* Propinas por barista — solo ADMIN */}
+          {isAdmin && (() => {
+            const activas = ventas.filter(v => v.estado !== 'ANULADA')
+            const byBarista: Record<string, { ventas: number; propinas: number }> = {}
+            activas.forEach(v => {
+              const nombre = v.usuarioNombre ?? '—'
+              if (!byBarista[nombre]) byBarista[nombre] = { ventas: 0, propinas: 0 }
+              byBarista[nombre].ventas++
+              byBarista[nombre].propinas += parseFloat(String(v.propina ?? 0))
+            })
+            const rows = Object.entries(byBarista)
+            if (rows.length === 0) return null
+            const totalPropinas = rows.reduce((s, [, d]) => s + d.propinas, 0)
+            return (
+              <div className="card overflow-hidden mb-6">
+                <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-stone-700">Propinas por barista</h2>
+                  <span className="text-xs text-stone-400">Solo ventas completadas</span>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-stone-100 text-left">
+                      <th className="px-5 py-2 text-xs font-medium text-stone-400 uppercase tracking-wide">Barista</th>
+                      <th className="px-5 py-2 text-xs font-medium text-stone-400 uppercase tracking-wide text-center">Ventas</th>
+                      <th className="px-5 py-2 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Propinas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-50">
+                    {rows.sort((a, b) => b[1].propinas - a[1].propinas).map(([nombre, data]) => (
+                      <tr key={nombre} className="hover:bg-surface-muted/40">
+                        <td className="px-5 py-2.5 font-medium text-stone-700">👤 {nombre}</td>
+                        <td className="px-5 py-2.5 text-stone-500 text-center">{data.ventas}</td>
+                        <td className="px-5 py-2.5 text-right font-semibold text-forest">{fmt(data.propinas)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-stone-100 bg-stone-50">
+                      <td className="px-5 py-2.5 text-xs font-semibold text-stone-500 uppercase">Total</td>
+                      <td className="px-5 py-2.5 text-center text-xs text-stone-400">{activas.length}</td>
+                      <td className="px-5 py-2.5 text-right font-bold text-stone-800">{fmt(totalPropinas)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )
+          })()}
+
           {/* Tabla de ventas */}
           {ventas.length === 0 ? (
             <div className="card px-6 py-16 text-center text-stone-400 text-sm">
@@ -157,6 +205,7 @@ export default function VentasPage() {
                   <tr className="border-b border-stone-100 text-left">
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide"># Venta</th>
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Hora</th>
+                    <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Barista</th>
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Items</th>
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Método</th>
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Total</th>
@@ -170,7 +219,7 @@ export default function VentasPage() {
                       const hora = new Date(row.miembros[0].creadaEn).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
                       return (
                         <tr key={`gh-${row.grupo}`} className="bg-amber-50/70 border-b-0">
-                          <td colSpan={6} className="px-5 py-2">
+                          <td colSpan={7} className="px-5 py-2">
                             <div className="flex items-center gap-3 text-xs">
                               <span className="font-semibold text-amber-700">Cuenta #{row.refId}</span>
                               <span className="bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-medium">dividida en {row.miembros.length}</span>
@@ -196,6 +245,12 @@ export default function VentasPage() {
                         </td>
                         <td className="px-5 py-3 text-stone-500">
                           {new Date(v.creadaEn).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-5 py-3">
+                          {v.usuarioNombre
+                            ? <span className="text-xs font-medium text-stone-600">{v.usuarioNombre}</span>
+                            : <span className="text-xs text-stone-300">—</span>
+                          }
                         </td>
                         <td className="px-5 py-3 text-stone-500">{v.items.length}</td>
                         <td className="px-5 py-3">
@@ -252,6 +307,15 @@ export default function VentasPage() {
                 )}
               </div>
             </div>
+            {detalle.usuarioNombre && (
+              <div className="flex items-center gap-2 text-sm text-stone-500 bg-stone-50 rounded-lg px-3 py-2">
+                <span>👤</span>
+                <span>
+                  {detalle.estado === 'ANULADA' ? 'Anulada por' : 'Vendido por'}
+                  <span className="font-semibold text-stone-700 ml-1">{detalle.usuarioNombre}</span>
+                </span>
+              </div>
+            )}
             {detalle.splitGrupo && (() => {
               const hermanas = ventas.filter(x => x.splitGrupo === detalle.splitGrupo)
               const refId = Math.min(...hermanas.map(x => x.id))
