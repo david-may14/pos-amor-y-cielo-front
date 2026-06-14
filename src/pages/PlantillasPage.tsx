@@ -234,7 +234,7 @@ export default function PlantillasPage() {
           <p className="text-stone-300 text-xs mt-1">Crea una plantilla como "Base Frappe" con vaso, tapa, hielo y leche</p>
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100 text-left">

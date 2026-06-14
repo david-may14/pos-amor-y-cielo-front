@@ -193,7 +193,7 @@ export default function DescuentosPage() {
           Sin descuentos. Crea uno para comenzar.
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100 text-left">
@@ -343,7 +343,7 @@ export default function DescuentosPage() {
                 <div>
                   <p className="text-sm font-medium text-stone-700 mb-2">Categorías</p>
                   <p className="text-xs text-stone-400 mb-3">El descuento aplica a todos los productos de las categorías seleccionadas. Categoría tiene prioridad sobre producto.</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {categorias.map((c) => (
                       <label key={c.id} className="flex items-center gap-2 cursor-pointer">
                         <input

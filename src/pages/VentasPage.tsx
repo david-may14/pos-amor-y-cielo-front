@@ -159,7 +159,7 @@ export default function VentasPage() {
             if (rows.length === 0) return null
             const totalPropinas = rows.reduce((s, [, d]) => s + d.propinas, 0)
             return (
-              <div className="card overflow-hidden mb-6">
+              <div className="card overflow-x-auto mb-6">
                 <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-stone-700">Propinas por barista</h2>
                   <span className="text-xs text-stone-400">Solo ventas completadas</span>
@@ -199,7 +199,7 @@ export default function VentasPage() {
               No hay ventas registradas para esta fecha.
             </div>
           ) : (
-            <div className="card overflow-hidden">
+            <div className="card overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-stone-100 text-left">

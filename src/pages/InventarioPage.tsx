@@ -159,7 +159,7 @@ export default function InventarioPage() {
       <h1 className="text-xl font-semibold text-stone-800 mb-6">Inventario</h1>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-surface-muted rounded-xl p-1 w-fit mb-6">
+      <div className="flex gap-1 bg-surface-muted rounded-xl p-1 w-full sm:w-fit mb-6 overflow-x-auto">
         {([['stock', 'Stock'], ['compras', 'Compras'], ['ajustes', 'Ajustes'], ['produccion', 'Producción'], ['historial', 'Historial']] as [Tab, string][]).map(([t, label]) => (
           <button
             key={t}
@@ -199,7 +199,7 @@ export default function InventarioPage() {
               </button>
             )}
           </div>
-          <div className="card overflow-hidden">
+          <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100 text-left">
@@ -481,7 +481,7 @@ export default function InventarioPage() {
 
       {/* Historial */}
       {tab === 'historial' && (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100 text-left">

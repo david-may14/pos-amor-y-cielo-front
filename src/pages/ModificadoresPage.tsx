@@ -220,7 +220,7 @@ export default function ModificadoresPage() {
           Sin modificadores. Crea uno para comenzar.
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100 text-left">
@@ -279,7 +279,7 @@ export default function ModificadoresPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">Mín. selección</label>
                 <input

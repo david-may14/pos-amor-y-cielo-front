@@ -155,8 +155,8 @@ export default function AnalyticsPage() {
           ) : null}
 
           {/* Gráfica + métodos */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="card p-5 col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="card p-5 lg:col-span-2">
               <h3 className="text-sm font-semibold text-stone-700 mb-4">
                 {esAnio ? 'Ingresos por mes' : 'Ingresos por día'}
               </h3>

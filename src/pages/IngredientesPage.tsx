@@ -355,7 +355,7 @@ export default function IngredientesPage() {
         </div>
       )}
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 text-left">

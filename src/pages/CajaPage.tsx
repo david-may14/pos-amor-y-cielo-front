@@ -199,7 +199,7 @@ export default function CajaPage() {
               <span className="bg-green-100 text-green-700 text-xs font-medium px-3 py-1 rounded-full">ABIERTO</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 border-t border-stone-100 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-stone-100 pt-4">
               <div className="text-center">
                 <p className="text-xs text-stone-400 mb-1">Fondo inicial</p>
                 <p className="font-semibold text-stone-700">{fmt(turnoActivo.fondoInicial)}</p>
@@ -454,7 +454,7 @@ export default function CajaPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-2 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                       <div>
                         <p className="text-stone-400">Fondo inicial</p>
                         <p className="font-medium text-stone-700">{fmt(t.fondoInicial)}</p>

@@ -26,8 +26,8 @@ export default function InsumosPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Tab bar */}
-      <div className="flex-shrink-0 bg-white border-b border-stone-100 px-6">
-        <div className="flex gap-0">
+      <div className="flex-shrink-0 bg-white border-b border-stone-100 px-6 overflow-x-auto">
+        <div className="flex gap-0 min-w-max">
           {TABS.map(({ key, label }) => (
             <button
               key={key}

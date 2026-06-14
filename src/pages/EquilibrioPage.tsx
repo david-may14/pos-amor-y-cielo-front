@@ -160,7 +160,7 @@ export default function EquilibrioPage() {
 
       {/* Breakdown chips */}
       {equilibrio && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <div className="card p-4 text-center">
             <p className="text-xs text-stone-400 mb-1">Gastos fijos</p>
             <p className="font-semibold text-stone-800">{fmt(totalGastos)}</p>

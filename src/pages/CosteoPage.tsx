@@ -349,7 +349,7 @@ export default function CosteoPage() {
         )}
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-stone-50 text-left border-b border-stone-100">
@@ -421,7 +421,7 @@ export default function CosteoPage() {
                 {expandido === p.productoId && detalle[p.productoId] && (
                   <tr key={`${p.productoId}-det`} className="bg-stone-50/50">
                     <td colSpan={8} className="px-6 py-4 bg-stone-50/50">
-                      <div className="grid grid-cols-2 gap-8">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                         {/* Tabla de ingredientes */}
                         <div>

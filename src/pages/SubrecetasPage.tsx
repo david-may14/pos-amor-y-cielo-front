@@ -159,7 +159,7 @@ export default function SubrecetasPage() {
           <p className="text-stone-300 text-xs mt-1">Crea una para ingredientes como Cold Brew, crema batida o jarabes</p>
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100 text-left">
