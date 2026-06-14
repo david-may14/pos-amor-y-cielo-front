@@ -91,6 +91,7 @@ export default function POSPage() {
   const [showSplit, setShowSplit] = useState(false)
   const [splitResults, setSplitResults] = useState<VentaResponse[] | null>(null)
   const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
+  const [vistaMovil, setVistaMovil] = useState<'productos' | 'carrito'>('productos')
 
   // Ticket activo (modo edición)
   const [ticketActivo, setTicketActivo] = useState<TicketResponse | null>(null)
@@ -341,6 +342,7 @@ export default function POSPage() {
   const clearCart = () => {
     setCart([])
     setExpandedNotas(new Set())
+    setVistaMovil('productos')
     setDescuentoTicket(null)
     setMontoRecibido('')
     setPropina('')
@@ -428,7 +430,7 @@ export default function POSPage() {
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* ── Productos ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`flex-1 flex flex-col overflow-hidden ${vistaMovil === 'carrito' ? 'hidden lg:flex' : 'flex'}`}>
         <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 flex gap-1 overflow-x-auto">
           {['Todos', ...categorias.map((c) => c.nombre)].map((cat) => (
             <button
@@ -533,12 +535,38 @@ export default function POSPage() {
             </div>
           )}
         </div>
+
+        {/* Botón flotante carrito — solo mobile */}
+        {cart.length > 0 && (
+          <div className="lg:hidden flex-shrink-0 p-3 bg-white border-t border-stone-100">
+            <button
+              onClick={() => setVistaMovil('carrito')}
+              className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-base"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+              </svg>
+              Ver carrito ({cart.reduce((s, i) => s + i.cantidad, 0)} ítem{cart.reduce((s, i) => s + i.cantidad, 0) !== 1 ? 's' : ''})
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Carrito ── */}
-      <aside className="w-80 flex-shrink-0 bg-white border-l border-stone-100 flex flex-col">
+      <aside className={`flex-shrink-0 bg-white border-l border-stone-100 flex flex-col w-full lg:w-80 ${vistaMovil === 'carrito' ? 'flex' : 'hidden lg:flex'}`}>
         <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
-          <h2 className="font-semibold text-stone-800">{ticketActivo ? 'Ticket abierto' : 'Orden'}</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setVistaMovil('productos')}
+              className="lg:hidden text-stone-400 hover:text-stone-700 p-1 -ml-1"
+              aria-label="Volver a productos"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+            <h2 className="font-semibold text-stone-800">{ticketActivo ? 'Ticket abierto' : 'Orden'}</h2>
+          </div>
           <div className="flex items-center gap-2">
             {cart.length > 0 && !ticketActivo && (
               <button onClick={clearCart} className="text-xs text-stone-400 hover:text-red-500 transition-colors">
