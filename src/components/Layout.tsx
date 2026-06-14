@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 interface NavItem {
@@ -153,6 +154,7 @@ const navItems: NavItem[] = [
 export default function Layout() {
   const { user, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -161,61 +163,104 @@ export default function Layout() {
 
   const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin)
 
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="flex items-center justify-center px-4 py-6 border-b border-white/10">
+        <img
+          src="/logo-cream.svg"
+          alt="Amor y Cielo"
+          style={{ height: '36px', width: 'auto', maxWidth: '140px', display: 'block' }}
+        />
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {visibleItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-forest text-cream'
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              }`
+            }
+          >
+            {item.icon}
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* User */}
+      <div className="px-3 py-4 border-t border-white/10">
+        <div className="px-3 py-2 mb-1">
+          <p className="text-sm font-medium text-cream truncate">{user?.nombre}</p>
+          <p className="text-xs text-white/40">{user?.rol}</p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" />
+          </svg>
+          Cerrar sesión
+        </button>
+      </div>
+    </>
+  )
+
   return (
     <div className="flex h-screen bg-surface overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 bg-forest-deep flex flex-col">
-        {/* Logo */}
-        <div className="flex items-center justify-center px-4 py-6 border-b border-white/10">
+
+      {/* Sidebar desktop — siempre visible en md+ */}
+      <aside className="hidden md:flex w-56 flex-shrink-0 bg-forest-deep flex-col">
+        {sidebarContent}
+      </aside>
+
+      {/* Sidebar mobile — overlay deslizable */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 flex md:hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => setSidebarOpen(false)}
+          />
+          {/* Panel */}
+          <aside className="relative z-50 w-56 flex-shrink-0 bg-forest-deep flex flex-col">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+
+      {/* Main content */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Header mobile con hamburguesa */}
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-forest-deep border-b border-white/10 flex-shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="text-white/70 hover:text-white p-1"
+            aria-label="Abrir menú"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
           <img
             src="/logo-cream.svg"
             alt="Amor y Cielo"
-            style={{ height: '36px', width: 'auto', maxWidth: '140px', display: 'block' }}
+            style={{ height: '28px', width: 'auto' }}
           />
-        </div>
+        </header>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {visibleItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-forest text-cream'
-                    : 'text-white/60 hover:text-white hover:bg-white/10'
-                }`
-              }
-            >
-              {item.icon}
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* User */}
-        <div className="px-3 py-4 border-t border-white/10">
-          <div className="px-3 py-2 mb-1">
-            <p className="text-sm font-medium text-cream truncate">{user?.nombre}</p>
-            <p className="text-xs text-white/40">{user?.rol}</p>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" />
-            </svg>
-            Cerrar sesión
-          </button>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <main className="flex-1 overflow-hidden flex flex-col">
-        <Outlet />
-      </main>
+        <main className="flex-1 overflow-hidden flex flex-col">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
