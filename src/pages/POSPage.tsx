@@ -6,6 +6,9 @@ import { crearVenta } from '../api/ventas'
 import { getDescuentoAplicable, listarDescuentos, listarDescuentosTicket } from '../api/descuentos'
 import { detalleTicket, crearTicket, actualizarTicket, cobrarTicket } from '../api/tickets'
 import { obtenerEquilibrio } from '../api/equilibrio'
+import { imprimirRecibo } from '../services/printer/recibo'
+import { isSerialSupported } from '../services/printer/connection'
+import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
 import type {
   ProductoDTO, Categoria, VentaResponse, MetodoPago, ModificadorGrupo, DescuentoView,
@@ -90,6 +93,9 @@ export default function POSPage() {
   const [ventaExitosa, setVentaExitosa] = useState<VentaResponse | null>(null)
   const [showSplit, setShowSplit] = useState(false)
   const [splitResults, setSplitResults] = useState<VentaResponse[] | null>(null)
+  const [imprimiendoId, setImprimiendoId] = useState<number | null>(null)
+  const [printError, setPrintError] = useState('')
+  const [abriendoCajon, setAbriendoCajon] = useState(false)
   const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
   const [vistaMovil, setVistaMovil] = useState<'productos' | 'carrito'>('productos')
 
@@ -390,6 +396,9 @@ export default function POSPage() {
         }))
         venta = await crearVenta(items, metodoPago, descuentoTicket?.id ?? null, propinaNum > 0 ? propinaNum : undefined)
       }
+      if (metodoPago === 'EFECTIVO' && isSerialSupported()) {
+        abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
+      }
       setVentaExitosa(venta)
       clearCart()
       cargarEquilibrio()
@@ -397,6 +406,30 @@ export default function POSPage() {
       setError(e instanceof Error ? e.message : 'Error al procesar la venta')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleAbrirCajon = async () => {
+    setPrintError('')
+    setAbriendoCajon(true)
+    try {
+      await abrirCajon()
+    } catch (e: unknown) {
+      setPrintError(e instanceof Error ? e.message : 'No se pudo abrir el cajón')
+    } finally {
+      setAbriendoCajon(false)
+    }
+  }
+
+  const handleImprimir = async (venta: VentaResponse) => {
+    setPrintError('')
+    setImprimiendoId(venta.id)
+    try {
+      await imprimirRecibo(venta)
+    } catch (e: unknown) {
+      setPrintError(e instanceof Error ? e.message : 'No se pudo imprimir el recibo')
+    } finally {
+      setImprimiendoId(null)
     }
   }
 
@@ -568,6 +601,22 @@ export default function POSPage() {
             <h2 className="font-semibold text-stone-800">{ticketActivo ? 'Ticket abierto' : 'Orden'}</h2>
           </div>
           <div className="flex items-center gap-2">
+            {isSerialSupported() && (
+              <button
+                onClick={handleAbrirCajon}
+                disabled={abriendoCajon}
+                title="Abrir cajón"
+                className="text-stone-400 hover:text-forest hover:bg-surface-muted rounded-lg p-1.5 transition-colors disabled:opacity-50"
+              >
+                {abriendoCajon ? (
+                  <Spinner className="w-4 h-4" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 8.25v10.5a1.5 1.5 0 0 0 1.5 1.5h16.5a1.5 1.5 0 0 0 1.5-1.5V8.25M2.25 8.25V6a1.5 1.5 0 0 1 1.5-1.5h16.5A1.5 1.5 0 0 1 21.75 6v2.25M10.5 12.75h3" />
+                  </svg>
+                )}
+              </button>
+            )}
             {cart.length > 0 && !ticketActivo && (
               <button onClick={clearCart} className="text-xs text-stone-400 hover:text-red-500 transition-colors">
                 Limpiar
@@ -595,6 +644,10 @@ export default function POSPage() {
             )}
           </div>
         </div>
+
+        {printError && !ventaExitosa && !splitResults && (
+          <p className="mx-5 mt-3 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{printError}</p>
+        )}
 
         {ticketActivo && (
           <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 text-xs">
@@ -1074,9 +1127,22 @@ export default function POSPage() {
                     <span>Total</span>
                     <span>{fmt(v.total + (v.propina ?? 0))}</span>
                   </div>
+                  {isSerialSupported() && (
+                    <button
+                      onClick={() => handleImprimir(v)}
+                      disabled={imprimiendoId === v.id}
+                      className="btn-secondary w-full py-1.5 text-xs mt-2 flex items-center justify-center gap-1.5"
+                    >
+                      {imprimiendoId === v.id && <Spinner className="w-3.5 h-3.5" />}
+                      {imprimiendoId === v.id ? 'Imprimiendo…' : 'Imprimir recibo'}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
+            {printError && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{printError}</p>
+            )}
             <button onClick={() => setSplitResults(null)} className="btn-primary w-full py-2.5">
               Nueva venta
             </button>
@@ -1160,9 +1226,25 @@ export default function POSPage() {
               </div>
             )}
 
-            <button onClick={() => setVentaExitosa(null)} className="btn-primary w-full py-2.5">
-              Nueva venta
-            </button>
+            {printError && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{printError}</p>
+            )}
+
+            <div className="flex gap-2">
+              {isSerialSupported() && (
+                <button
+                  onClick={() => handleImprimir(ventaExitosa)}
+                  disabled={imprimiendoId === ventaExitosa.id}
+                  className="btn-secondary flex-1 py-2.5 flex items-center justify-center gap-2"
+                >
+                  {imprimiendoId === ventaExitosa.id && <Spinner className="w-4 h-4" />}
+                  {imprimiendoId === ventaExitosa.id ? 'Imprimiendo…' : 'Imprimir recibo'}
+                </button>
+              )}
+              <button onClick={() => setVentaExitosa(null)} className="btn-primary flex-1 py-2.5">
+                Nueva venta
+              </button>
+            </div>
           </div>
         </Modal>
       )}

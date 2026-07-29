@@ -13,6 +13,8 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { crearVenta, anularVenta } from '../api/ventas'
+import { isSerialSupported } from '../services/printer/connection'
+import { abrirCajon } from '../services/printer/cajon'
 import type { VentaResponse, MetodoPago } from '../types/api'
 import Modal from './Modal'
 import Spinner from './Spinner'
@@ -386,6 +388,9 @@ export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
         propina > 0 ? propina : undefined,
         splitId,
       )
+      if (c.metodoPago === 'EFECTIVO' && isSerialSupported()) {
+        abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
+      }
       setPagadas(prev => ({ ...prev, [c.id]: venta }))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al procesar venta')
