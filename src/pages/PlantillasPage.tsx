@@ -209,7 +209,7 @@ export default function PlantillasPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl font-semibold text-stone-800">Plantillas de receta</h1>
           <p className="text-sm text-stone-400 mt-0.5">

@@ -182,7 +182,7 @@ export default function PreciosIngredienteModal({ ingrediente, onClose, onUpdate
                 onChange={e => setForm({ ...form, proveedor: e.target.value })}
                 placeholder="Walmart, Costco…" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">Precio total pagado (MXN)</label>
                 <input className="input" type="number" min="0" step="0.01" value={form.precioTotal}

@@ -27,7 +27,7 @@ export default function Toast({ message, type = 'success', onClose, duration = 3
 
   return createPortal(
     <div
-      className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 ${colors} ${
+      className={`safe-bottom fixed bottom-6 left-6 right-6 sm:left-auto max-w-[calc(100vw-3rem)] sm:max-w-sm z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 ${colors} ${
         visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
       }`}
     >

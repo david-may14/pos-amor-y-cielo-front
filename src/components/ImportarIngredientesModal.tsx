@@ -113,6 +113,7 @@ export default function ImportarIngredientesModal({ onClose, onSuccess }: Props)
                   <span className="text-emerald-600 text-xs">{open.has('crear') ? '▲' : '▼'}</span>
                 </button>
                 {open.has('crear') && (
+                  <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead><tr className="border-b border-stone-100 bg-white">
                       <th className="px-4 py-2 text-left text-stone-400 font-medium">Nombre</th>
@@ -133,6 +134,7 @@ export default function ImportarIngredientesModal({ onClose, onSuccess }: Props)
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             )}

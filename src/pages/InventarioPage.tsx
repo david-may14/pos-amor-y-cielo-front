@@ -278,7 +278,7 @@ export default function InventarioPage() {
           </p>
           <div className="space-y-3">
             {lineas.map((linea, i) => (
-              <div key={i} className="flex gap-2 items-end">
+              <div key={i} className="flex flex-col sm:flex-row gap-2 sm:items-end border-b border-stone-100 pb-3 sm:border-0 sm:pb-0">
                 <div className="flex-1">
                   {i === 0 && <label className="label">Ingrediente</label>}
                   <select
@@ -294,35 +294,37 @@ export default function InventarioPage() {
                     ))}
                   </select>
                 </div>
-                <div className="w-28">
-                  {i === 0 && <label className="label">Cantidad</label>}
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={linea.cantidad}
-                    onChange={(e) => updateLinea(i, 'cantidad', e.target.value)}
-                  />
+                <div className="flex gap-2 items-end">
+                  <div className="w-28">
+                    {i === 0 && <label className="label">Cantidad</label>}
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={linea.cantidad}
+                      onChange={(e) => updateLinea(i, 'cantidad', e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    {i === 0 && <label className="label">Nota (opcional)</label>}
+                    <input
+                      className="input"
+                      placeholder="Proveedor, lote…"
+                      value={linea.nota}
+                      onChange={(e) => updateLinea(i, 'nota', e.target.value)}
+                    />
+                  </div>
+                  {lineas.length > 1 && (
+                    <button
+                      onClick={() => removeLinea(i)}
+                      className="text-red-400 hover:text-red-600 pb-2 text-lg px-2"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1">
-                  {i === 0 && <label className="label">Nota (opcional)</label>}
-                  <input
-                    className="input"
-                    placeholder="Proveedor, lote…"
-                    value={linea.nota}
-                    onChange={(e) => updateLinea(i, 'nota', e.target.value)}
-                  />
-                </div>
-                {lineas.length > 1 && (
-                  <button
-                    onClick={() => removeLinea(i)}
-                    className="text-red-400 hover:text-red-600 pb-2 text-lg"
-                  >
-                    ×
-                  </button>
-                )}
               </div>
             ))}
           </div>
@@ -360,7 +362,7 @@ export default function InventarioPage() {
                 ))}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">Tipo</label>
                 <select

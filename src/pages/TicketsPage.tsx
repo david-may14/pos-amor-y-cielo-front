@@ -87,8 +87,8 @@ export default function TicketsPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 bg-white border-b border-stone-100 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+      <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-6">
           <h1 className="text-lg font-semibold text-stone-800">Comandas</h1>
           <div className="flex gap-1 bg-surface-muted rounded-lg p-1">
             {(['abiertas', 'historial'] as Vista[]).map((v) => (

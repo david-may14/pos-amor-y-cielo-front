@@ -3,6 +3,7 @@ import {
   DndContext,
   closestCenter,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -52,7 +53,7 @@ function CategoriaRow({ categoria, onEdit, onDelete }: RowProps) {
       <button
         {...attributes}
         {...listeners}
-        className="text-stone-300 hover:text-stone-500 cursor-grab active:cursor-grabbing touch-none"
+        className="p-2 -m-2 text-stone-300 hover:text-stone-500 cursor-grab active:cursor-grabbing touch-none"
         tabIndex={-1}
         aria-label="Arrastrar para reordenar"
       >
@@ -89,7 +90,10 @@ export default function CategoriasPage() {
   const [formError, setFormError] = useState('')
   const [formSaving, setFormSaving] = useState(false)
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  )
 
   const cargar = useCallback(async () => {
     setLoading(true)

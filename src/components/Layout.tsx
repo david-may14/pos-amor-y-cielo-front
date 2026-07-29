@@ -166,7 +166,7 @@ export default function Layout() {
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="flex items-center justify-center px-4 py-6 border-b border-white/10">
+      <div className="safe-top flex items-center justify-center px-4 py-6 border-b border-white/10">
         <img
           src="/logo-cream.svg"
           alt="Amor y Cielo"
@@ -217,14 +217,14 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-surface overflow-hidden">
 
-      {/* Sidebar desktop — siempre visible en md+ */}
-      <aside className="hidden md:flex w-56 flex-shrink-0 bg-forest-deep flex-col">
+      {/* Sidebar desktop — siempre visible en lg+ (md/tablet usa el menú hamburguesa para no robar ancho a las grillas de contenido) */}
+      <aside className="hidden lg:flex w-56 flex-shrink-0 bg-forest-deep flex-col">
         {sidebarContent}
       </aside>
 
-      {/* Sidebar mobile — overlay deslizable */}
+      {/* Sidebar mobile/tablet — overlay deslizable */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 flex md:hidden">
+        <div className="fixed inset-0 z-40 flex lg:hidden">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/50"
@@ -239,8 +239,8 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        {/* Header mobile con hamburguesa */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-forest-deep border-b border-white/10 flex-shrink-0">
+        {/* Header mobile/tablet con hamburguesa */}
+        <header className="safe-top lg:hidden flex items-center gap-3 px-4 py-3 bg-forest-deep border-b border-white/10 flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
             className="text-white/70 hover:text-white p-1"
@@ -257,7 +257,7 @@ export default function Layout() {
           />
         </header>
 
-        <main className="flex-1 overflow-hidden flex flex-col">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
           <Outlet />
         </main>
       </div>

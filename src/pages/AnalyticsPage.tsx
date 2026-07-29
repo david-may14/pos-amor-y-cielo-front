@@ -104,13 +104,13 @@ export default function AnalyticsPage() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-xl font-semibold text-stone-800">Reportes</h1>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-surface-muted rounded-xl p-1 gap-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
+          <div className="flex bg-surface-muted rounded-xl p-1 gap-1 overflow-x-auto">
             {RANGOS.map(([r, label]) => (
               <button key={r} onClick={() => setRango(r)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
                   rango === r ? 'bg-white text-forest shadow-sm' : 'text-stone-500 hover:text-stone-700'
                 }`}>
                 {label}

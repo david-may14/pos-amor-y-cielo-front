@@ -176,7 +176,7 @@ export default function DescuentosPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl font-semibold text-stone-800">Descuentos</h1>
           <p className="text-sm text-stone-400 mt-0.5">Por categoría, por producto o para el ticket completo</p>
@@ -270,7 +270,7 @@ export default function DescuentosPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">Tipo</label>
                 <select
@@ -302,7 +302,7 @@ export default function DescuentosPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">Aplica a</label>
                 <select
