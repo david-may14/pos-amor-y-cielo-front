@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { obtenerConfiguracion, actualizarConfiguracion } from '../api/configuracion'
+import { isAndroidApp } from '../services/printer/androidBridge'
 import Spinner from '../components/Spinner'
 import Toast from '../components/Toast'
+import ImpresoraAndroidCard from '../components/ImpresoraAndroidCard'
 
 export default function ConfiguracionPage() {
   const [iva, setIva] = useState('')
@@ -165,6 +167,8 @@ export default function ConfiguracionPage() {
           </button>
         </div>
       </div>
+
+      {isAndroidApp() && <ImpresoraAndroidCard />}
 
       <div className="mt-6 card px-5 py-4 bg-amber-50/50 border border-amber-100">
         <p className="text-xs font-semibold text-amber-700 mb-1">Nota importante</p>

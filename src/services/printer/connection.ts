@@ -1,5 +1,12 @@
+import { isAndroidApp, printBytesAndroid } from './androidBridge'
+
 export function isSerialSupported(): boolean {
   return 'serial' in navigator
+}
+
+/** true si hay alguna forma de imprimir disponible en esta plataforma (Android nativo o Web Serial). */
+export function isPrinterAvailable(): boolean {
+  return isAndroidApp() || isSerialSupported()
 }
 
 let cachedPort: SerialPort | null = null
@@ -18,6 +25,10 @@ async function getPrinterPort(): Promise<SerialPort> {
 }
 
 export async function printBytes(bytes: Uint8Array): Promise<void> {
+  if (isAndroidApp()) {
+    return printBytesAndroid(bytes)
+  }
+
   if (!isSerialSupported()) {
     throw new Error('Este navegador no soporta impresión por Bluetooth (Web Serial no disponible).')
   }

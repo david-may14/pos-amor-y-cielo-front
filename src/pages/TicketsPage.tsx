@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listarTickets, cancelarTicket, historialTickets } from '../api/tickets'
 import { imprimirCuenta } from '../services/printer/cuenta'
-import { isSerialSupported } from '../services/printer/connection'
+import { isPrinterAvailable } from '../services/printer/connection'
 import type { TicketResponse } from '../types/api'
 import Spinner from '../components/Spinner'
 
@@ -347,7 +347,7 @@ function TicketCardAbierta({
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
           </button>
-          {isSerialSupported() && (
+          {isPrinterAvailable() && (
             <button
               onClick={handleImprimir}
               disabled={imprimiendo}

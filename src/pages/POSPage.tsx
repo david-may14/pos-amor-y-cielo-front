@@ -7,7 +7,7 @@ import { getDescuentoAplicable, listarDescuentos, listarDescuentosTicket } from 
 import { detalleTicket, crearTicket, actualizarTicket, cobrarTicket } from '../api/tickets'
 import { obtenerEquilibrio } from '../api/equilibrio'
 import { imprimirRecibo } from '../services/printer/recibo'
-import { isSerialSupported } from '../services/printer/connection'
+import { isPrinterAvailable } from '../services/printer/connection'
 import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
 import type {
@@ -396,7 +396,7 @@ export default function POSPage() {
         }))
         venta = await crearVenta(items, metodoPago, descuentoTicket?.id ?? null, propinaNum > 0 ? propinaNum : undefined)
       }
-      if (metodoPago === 'EFECTIVO' && isSerialSupported()) {
+      if (metodoPago === 'EFECTIVO' && isPrinterAvailable()) {
         abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
       }
       setVentaExitosa(venta)
@@ -464,21 +464,43 @@ export default function POSPage() {
     <div className="flex-1 flex overflow-hidden">
       {/* ── Productos ── */}
       <div className={`flex-1 flex flex-col overflow-hidden ${vistaMovil === 'carrito' ? 'hidden lg:flex' : 'flex'}`}>
-        <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 flex gap-1 overflow-x-auto">
-          {['Todos', ...categorias.map((c) => c.nombre)].map((cat) => (
+        <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 flex items-center gap-1">
+          <div className="flex gap-1 overflow-x-auto">
+            {['Todos', ...categorias.map((c) => c.nombre)].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategoria(cat)}
+                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  selectedCategoria === cat
+                    ? 'border-forest text-forest'
+                    : 'border-transparent text-stone-400 hover:text-stone-700'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          {isPrinterAvailable() && (
             <button
-              key={cat}
-              onClick={() => setSelectedCategoria(cat)}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                selectedCategoria === cat
-                  ? 'border-forest text-forest'
-                  : 'border-transparent text-stone-400 hover:text-stone-700'
-              }`}
+              onClick={handleAbrirCajon}
+              disabled={abriendoCajon}
+              title="Abrir cajón"
+              className="flex-shrink-0 ml-auto text-stone-400 hover:text-forest hover:bg-surface-muted rounded-lg p-2 transition-colors disabled:opacity-50"
             >
-              {cat}
+              {abriendoCajon ? (
+                <Spinner className="w-4 h-4" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 8.25v10.5a1.5 1.5 0 0 0 1.5 1.5h16.5a1.5 1.5 0 0 0 1.5-1.5V8.25M2.25 8.25V6a1.5 1.5 0 0 1 1.5-1.5h16.5A1.5 1.5 0 0 1 21.75 6v2.25M10.5 12.75h3" />
+                </svg>
+              )}
             </button>
-          ))}
+          )}
         </div>
+
+        {printError && !ventaExitosa && !splitResults && (
+          <p className="mx-4 mt-3 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{printError}</p>
+        )}
 
         {isAdmin && equilibrio && (
           <div className={`flex-shrink-0 mx-4 mt-2 rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm ${
@@ -601,22 +623,6 @@ export default function POSPage() {
             <h2 className="font-semibold text-stone-800">{ticketActivo ? 'Ticket abierto' : 'Orden'}</h2>
           </div>
           <div className="flex items-center gap-2">
-            {isSerialSupported() && (
-              <button
-                onClick={handleAbrirCajon}
-                disabled={abriendoCajon}
-                title="Abrir cajón"
-                className="text-stone-400 hover:text-forest hover:bg-surface-muted rounded-lg p-1.5 transition-colors disabled:opacity-50"
-              >
-                {abriendoCajon ? (
-                  <Spinner className="w-4 h-4" />
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 8.25v10.5a1.5 1.5 0 0 0 1.5 1.5h16.5a1.5 1.5 0 0 0 1.5-1.5V8.25M2.25 8.25V6a1.5 1.5 0 0 1 1.5-1.5h16.5A1.5 1.5 0 0 1 21.75 6v2.25M10.5 12.75h3" />
-                  </svg>
-                )}
-              </button>
-            )}
             {cart.length > 0 && !ticketActivo && (
               <button onClick={clearCart} className="text-xs text-stone-400 hover:text-red-500 transition-colors">
                 Limpiar
@@ -644,10 +650,6 @@ export default function POSPage() {
             )}
           </div>
         </div>
-
-        {printError && !ventaExitosa && !splitResults && (
-          <p className="mx-5 mt-3 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{printError}</p>
-        )}
 
         {ticketActivo && (
           <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 text-xs">
@@ -1127,7 +1129,7 @@ export default function POSPage() {
                     <span>Total</span>
                     <span>{fmt(v.total + (v.propina ?? 0))}</span>
                   </div>
-                  {isSerialSupported() && (
+                  {isPrinterAvailable() && (
                     <button
                       onClick={() => handleImprimir(v)}
                       disabled={imprimiendoId === v.id}
@@ -1231,7 +1233,7 @@ export default function POSPage() {
             )}
 
             <div className="flex gap-2">
-              {isSerialSupported() && (
+              {isPrinterAvailable() && (
                 <button
                   onClick={() => handleImprimir(ventaExitosa)}
                   disabled={imprimiendoId === ventaExitosa.id}
