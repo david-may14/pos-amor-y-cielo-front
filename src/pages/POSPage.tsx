@@ -3,8 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { listarProductosOffline, listarModificadoresProductoOffline } from '../api/productos'
 import { listarCategoriasOffline } from '../api/categorias'
 import { crearVenta } from '../api/ventas'
-import { getDescuentoAplicableOffline, listarDescuentos, listarDescuentosTicketOffline } from '../api/descuentos'
-import { detalleTicket, crearTicket, actualizarTicket, cobrarTicket } from '../api/tickets'
+import { getDescuentoAplicableOffline, listarDescuentosOffline, listarDescuentosTicketOffline } from '../api/descuentos'
+import {
+  crearTicketLocal, actualizarTicketLocal, obtenerTicketLocal, marcarTicketCobrado,
+} from '../db/offlineTickets'
+import type { TicketLocal } from '../db/offlineDb'
 import { obtenerEquilibrio } from '../api/equilibrio'
 import { imprimirRecibo } from '../services/printer/recibo'
 import { isPrinterAvailable } from '../services/printer/connection'
@@ -145,7 +148,7 @@ export default function POSPage() {
   const [vistaMovil, setVistaMovil] = useState<'productos' | 'carrito'>('productos')
 
   // Ticket activo (modo edición)
-  const [ticketActivo, setTicketActivo] = useState<TicketResponse | null>(null)
+  const [ticketActivo, setTicketActivo] = useState<TicketLocal | null>(null)
   const [showGuardarTicket, setShowGuardarTicket] = useState(false)
   const [nombreTicketInput, setNombreTicketInput] = useState('')
   const [savingTicket, setSavingTicket] = useState(false)
@@ -200,22 +203,25 @@ export default function POSPage() {
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { cargarEquilibrio() }, [cargarEquilibrio])
 
-  // Hidratar ticket desde el state de navegación
-  const hidratarTicket = useCallback(async (ticketId: number) => {
+  // Hidratar ticket desde el state de navegación. Sale del almacén local, así
+  // que abrir una comanda funciona igual sin conexión.
+  const hidratarTicket = useCallback(async (clientId: string) => {
     try {
-      const [t, descuentos] = await Promise.all([
-        detalleTicket(ticketId),
-        listarDescuentos().catch(() => [] as DescuentoView[]),
-      ])
+      const t = await obtenerTicketLocal(clientId)
+      if (!t) {
+        setError('No se encontró la comanda en este dispositivo')
+        return
+      }
+      const descuentos = await listarDescuentosOffline().catch(() => [] as DescuentoView[])
       const descById = new Map(descuentos.map(d => [d.id, d]))
       const items: CartItem[] = t.items.map((ti, idx) => ({
-        lineId: `tk-${t.id}-${ti.id}-${idx}`,
+        lineId: `tk-${t.clientId}-${idx}`,
         productoId: ti.productoId,
         nombre: ti.nombreProducto,
         precioUnitario: ti.precioUnitario,
         cantidad: ti.cantidad,
         notas: ti.notas ?? '',
-        mods: ti.modificadores.map(m => ({ opcionId: m.opcionId, nombre: m.nombre, precioExtra: m.precioExtra })),
+        mods: (ti.modificadores ?? []).map(m => ({ opcionId: m.opcionId, nombre: m.nombre, precioExtra: m.precioExtra })),
         descuento: ti.descuentoId
           ? (() => {
               const d = descById.get(ti.descuentoId!)
@@ -231,9 +237,9 @@ export default function POSPage() {
   }, [])
 
   useEffect(() => {
-    const ticketId = (location.state as { ticketId?: number } | null)?.ticketId
-    if (ticketId) {
-      hidratarTicket(ticketId)
+    const clientId = (location.state as { ticketClientId?: string } | null)?.ticketClientId
+    if (clientId) {
+      hidratarTicket(clientId)
       // limpiar el state para que un refresh no recargue
       navigate(location.pathname, { replace: true })
     }
@@ -259,12 +265,16 @@ export default function POSPage() {
     setSavingTicket(true)
     setError('')
     try {
-      const payload = { nombre: nombreTicketInput.trim() || null, items: cartToTicketItems() }
+      // Se guarda en el dispositivo y se sube en cuanto haya red: guardar una
+      // comanda nunca depende de la conexión.
+      const nombre = nombreTicketInput.trim() || null
+      const items = cartToTicketItems()
       if (ticketActivo) {
-        const t = await actualizarTicket(ticketActivo.id, payload)
-        setTicketActivo(t)
+        await actualizarTicketLocal(ticketActivo.clientId, nombre, items)
+        const t = await obtenerTicketLocal(ticketActivo.clientId)
+        if (t) setTicketActivo(t)
       } else {
-        await crearTicket(payload)
+        await crearTicketLocal(nombre, items)
         clearCart()
         setTicketActivo(null)
       }
@@ -426,45 +436,47 @@ export default function POSPage() {
     setError('')
     try {
       let venta: VentaResponse
+      const items = cart.map((i) => ({
+        productoId: i.productoId,
+        cantidad: i.cantidad,
+        ...(i.notas ? { notas: i.notas } : {}),
+        ...(i.mods.length > 0 ? { modificadorOpcionIds: i.mods.map((m) => m.opcionId) } : {}),
+        ...(i.descuento ? { descuentoId: i.descuento.descuentoId } : {}),
+      }))
+      const descuentoTicketId = descuentoTicket?.id ?? null
+      const propinaFinal = propinaNum > 0 ? propinaNum : 0
+
+      // Cobrar una comanda es cobrar sus items: se registra la venta igual que
+      // una normal y la comanda se marca como cobrada en el dispositivo. Así el
+      // cobro tampoco depende de la conexión.
       if (ticketActivo) {
-        // Sincronizar items por si fueron modificados, luego cobrar
-        await actualizarTicket(ticketActivo.id, {
-          nombre: ticketActivo.nombre,
-          items: cartToTicketItems(),
-        })
-        venta = await cobrarTicket(ticketActivo.id, {
-          metodoPago,
-          descuentoTicketId: descuentoTicket?.id ?? null,
-          propina: propinaNum > 0 ? propinaNum : 0,
-        })
-        setTicketActivo(null)
-      } else {
-        const items = cart.map((i) => ({
-          productoId: i.productoId,
-          cantidad: i.cantidad,
-          ...(i.notas ? { notas: i.notas } : {}),
-          ...(i.mods.length > 0 ? { modificadorOpcionIds: i.mods.map((m) => m.opcionId) } : {}),
-          ...(i.descuento ? { descuentoId: i.descuento.descuentoId } : {}),
-        }))
-        const descuentoTicketId = descuentoTicket?.id ?? null
-        const propinaFinal = propinaNum > 0 ? propinaNum : 0
-        try {
-          venta = await crearVenta(items, metodoPago, descuentoTicketId, propinaFinal || undefined)
-        } catch (e) {
-          if (!esErrorDeRed(e)) throw e
-          const pendiente = await encolarVenta({ items, metodoPago, descuentoTicketId, propina: propinaFinal })
-          venta = ventaPendienteAVentaResponse({
-            clientId: pendiente.clientId,
-            ocurrioEn: pendiente.ocurrioEn,
-            metodoPago,
-            cart,
-            total,
-            descuentoTicket,
-            descuentoTicketMonto,
-            propina: propinaFinal,
-          })
-        }
+        await actualizarTicketLocal(ticketActivo.clientId, ticketActivo.nombre, cartToTicketItems())
       }
+
+      // Se genera aquí y no solo en la cola offline: es lo que permite enlazar
+      // la comanda con su venta al sincronizar, y de paso hace idempotente el
+      // reintento si la respuesta se pierde.
+      const ventaClientId = crypto.randomUUID()
+
+      try {
+        venta = await crearVenta(items, metodoPago, descuentoTicketId, propinaFinal || undefined, null, ventaClientId)
+        if (ticketActivo) await marcarTicketCobrado(ticketActivo.clientId, ventaClientId)
+      } catch (e) {
+        if (!esErrorDeRed(e)) throw e
+        const pendiente = await encolarVenta({ items, metodoPago, descuentoTicketId, propina: propinaFinal })
+        if (ticketActivo) await marcarTicketCobrado(ticketActivo.clientId, pendiente.clientId)
+        venta = ventaPendienteAVentaResponse({
+          clientId: pendiente.clientId,
+          ocurrioEn: pendiente.ocurrioEn,
+          metodoPago,
+          cart,
+          total,
+          descuentoTicket,
+          descuentoTicketMonto,
+          propina: propinaFinal,
+        })
+      }
+      if (ticketActivo) setTicketActivo(null)
       if (metodoPago === 'EFECTIVO' && isPrinterAvailable()) {
         abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
       }
@@ -751,7 +763,7 @@ export default function POSPage() {
         {ticketActivo && (
           <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 text-xs">
             <p className="font-semibold text-amber-800 truncate">
-              Ticket #{ticketActivo.id} - {fmtHora(ticketActivo.creadoEn)}
+              {ticketActivo.servidorId ? `Ticket #${ticketActivo.servidorId}` : 'Comanda'} - {fmtHora(ticketActivo.creadoEn)}
             </p>
             {ticketActivo.nombre && (
               <p className="text-amber-600 truncate mt-0.5">{ticketActivo.nombre}</p>

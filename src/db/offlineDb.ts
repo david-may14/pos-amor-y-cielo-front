@@ -34,10 +34,43 @@ export interface SesionPin {
   creadoEn: string
 }
 
+/** Item de una comanda tal y como se guarda en el dispositivo. */
+export interface TicketItemLocal {
+  productoId: number
+  nombreProducto: string
+  cantidad: number
+  precioUnitario: number
+  notas?: string | null
+  descuentoId?: number | null
+  modificadores?: { opcionId: number; nombre: string; precioExtra: number }[]
+}
+
+/**
+ * Comanda guardada en el dispositivo. Es la copia con la que trabaja la caja:
+ * se puede crear y editar sin conexión, y el servidor se entera después.
+ */
+export interface TicketLocal {
+  clientId: string
+  /** id del servidor una vez sincronizada; null mientras solo existe aquí. */
+  servidorId: number | null
+  nombre: string | null
+  estado: 'ABIERTO' | 'COBRADO' | 'CANCELADO'
+  items: TicketItemLocal[]
+  totalEstimado: number
+  creadoEn: string
+  actualizadoEn: string
+  /** Si se cobró sin conexión, la venta encolada a la que corresponde. */
+  ventaClientId?: string
+  /** true mientras el servidor no tenga esta versión. */
+  pendiente: boolean
+  ultimoError?: string
+}
+
 class OfflineDb extends Dexie {
   ventasPendientes!: Table<VentaPendiente, string>
   cache!: Table<CacheEntry, string>
   sesionPin!: Table<SesionPin, string>
+  tickets!: Table<TicketLocal, string>
 
   constructor() {
     super('pos_amor_y_cielo_offline')
@@ -49,6 +82,13 @@ class OfflineDb extends Dexie {
       ventasPendientes: 'clientId, creadoEn',
       cache: 'key',
       sesionPin: 'id',
+    })
+    this.version(3).stores({
+      ventasPendientes: 'clientId, creadoEn',
+      cache: 'key',
+      sesionPin: 'id',
+      // pendiente no se indexa: IndexedDB no admite booleanos como clave.
+      tickets: 'clientId, estado, actualizadoEn',
     })
   }
 }

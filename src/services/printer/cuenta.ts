@@ -1,7 +1,24 @@
 import { ReceiptBuilder } from './escpos'
 import { printBytes } from './connection'
 import { imprimirEncabezado } from './encabezado'
-import type { TicketResponse } from '../../types/api'
+/**
+ * Forma mínima que necesita una cuenta. Se define aquí en vez de usar
+ * TicketResponse para poder imprimir también comandas que solo existen en el
+ * dispositivo y todavía no tienen id del servidor.
+ */
+export interface CuentaImprimible {
+  id?: number | null
+  nombre: string | null
+  creadoEn: string
+  totalEstimado: number
+  items: {
+    cantidad: number
+    nombreProducto: string
+    precioUnitario: number
+    notas?: string | null
+    modificadores?: { nombre: string }[]
+  }[]
+}
 
 const fmt = (n: number) => `$${n.toFixed(2)}`
 
@@ -11,12 +28,12 @@ const fmtFecha = (iso: string) =>
     hour: '2-digit', minute: '2-digit', hour12: false,
   })
 
-export async function construirCuenta(ticket: TicketResponse): Promise<Uint8Array> {
+export async function construirCuenta(ticket: CuentaImprimible): Promise<Uint8Array> {
   const b = new ReceiptBuilder().init()
   await imprimirEncabezado(b)
 
   b.divider()
-  b.line(`Ticket #${ticket.id}${ticket.nombre ? ` · ${ticket.nombre}` : ''}`)
+  b.line(`${ticket.id ? `Ticket #${ticket.id}` : 'Comanda'}${ticket.nombre ? ` · ${ticket.nombre}` : ''}`)
   b.line(fmtFecha(ticket.creadoEn))
   b.divider()
 
@@ -39,6 +56,6 @@ export async function construirCuenta(ticket: TicketResponse): Promise<Uint8Arra
   return b.build()
 }
 
-export async function imprimirCuenta(ticket: TicketResponse): Promise<void> {
+export async function imprimirCuenta(ticket: CuentaImprimible): Promise<void> {
   await printBytes(await construirCuenta(ticket))
 }

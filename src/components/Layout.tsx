@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { iniciarAutoSync, sincronizarPendientes, usePendientesCount } from '../db/offlineSales'
 import { iniciarPrecarga } from '../db/precargaCatalogo'
+import { iniciarAutoSyncTickets } from '../db/offlineTickets'
 import { useVersionApp } from '../hooks/useVersionApp'
 
 interface NavItem {
@@ -164,6 +165,7 @@ export default function Layout() {
 
   useEffect(() => {
     iniciarAutoSync()
+    iniciarAutoSyncTickets()
     // Baja el catálogo completo apenas hay sesión, para poder vender offline
     // aunque nunca se haya abierto Caja con internet.
     iniciarPrecarga()

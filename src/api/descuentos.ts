@@ -4,6 +4,10 @@ import type { DescuentoView, DescuentoRequest } from '../types/api'
 export const listarDescuentos = () =>
   api.get<DescuentoView[]>('/api/descuentos')
 
+/** Para la caja: hace falta al abrir una comanda, que debe funcionar sin conexión. */
+export const listarDescuentosOffline = () =>
+  api.getCached<DescuentoView[]>('descuentos', '/api/descuentos')
+
 export const crearDescuento = (data: DescuentoRequest) =>
   api.post<DescuentoView>('/api/descuentos', data)
 

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listarTickets, cancelarTicket, historialTickets } from '../api/tickets'
+import { historialTickets } from '../api/tickets'
+import { cancelarTicketLocal, sincronizarTickets, useTicketsAbiertos } from '../db/offlineTickets'
 import { imprimirCuenta } from '../services/printer/cuenta'
 import { isPrinterAvailable } from '../services/printer/connection'
 import type { TicketResponse } from '../types/api'
+import type { TicketLocal } from '../db/offlineDb'
 import Spinner from '../components/Spinner'
 
 const fmt = (n: number) =>
@@ -21,18 +23,20 @@ export default function TicketsPage() {
   const [vista, setVista] = useState<Vista>('abiertas')
 
   // ── Abiertas ────────────────────────────────────────────────────────────────
-  const [tickets, setTickets] = useState<TicketResponse[]>([])
-  const [loadingAbiertas, setLoadingAbiertas] = useState(true)
+  // Salen del almacén local, así que la lista se ve y se edita sin conexión.
+  // useLiveQuery las refresca solas cuando la sincronización trae novedades.
+  const tickets = useTicketsAbiertos()
+  const [loadingAbiertas, setLoadingAbiertas] = useState(false)
   const [errorAbiertas, setErrorAbiertas] = useState('')
-  const [cancelando, setCancelando] = useState<number | null>(null)
-  const [confirmCancel, setConfirmCancel] = useState<TicketResponse | null>(null)
+  const [cancelando, setCancelando] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<TicketLocal | null>(null)
 
   const cargarAbiertas = useCallback(async () => {
     try {
-      setTickets(await listarTickets('ABIERTO'))
+      await sincronizarTickets()
       setErrorAbiertas('')
     } catch (e: unknown) {
-      setErrorAbiertas(e instanceof Error ? e.message : 'Error al cargar')
+      setErrorAbiertas(e instanceof Error ? e.message : 'Error al sincronizar')
     } finally {
       setLoadingAbiertas(false)
     }
@@ -46,10 +50,9 @@ export default function TicketsPage() {
 
   const handleCancelar = async () => {
     if (!confirmCancel) return
-    setCancelando(confirmCancel.id)
+    setCancelando(confirmCancel.clientId)
     try {
-      await cancelarTicket(confirmCancel.id)
-      setTickets((prev) => prev.filter((t) => t.id !== confirmCancel.id))
+      await cancelarTicketLocal(confirmCancel.clientId)
       setConfirmCancel(null)
     } catch (e: unknown) {
       setErrorAbiertas(e instanceof Error ? e.message : 'Error al cancelar')
@@ -157,9 +160,9 @@ export default function TicketsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {tickets.map((ticket) => (
                   <TicketCardAbierta
-                    key={ticket.id}
+                    key={ticket.clientId}
                     ticket={ticket}
-                    onCargar={(t) => navigate('/pos', { state: { ticketId: t.id } })}
+                    onCargar={(t) => navigate('/pos', { state: { ticketClientId: t.clientId } })}
                     onCancelar={(t) => setConfirmCancel(t)}
                   />
                 ))}
@@ -237,7 +240,7 @@ export default function TicketsPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
             <h3 className="font-semibold text-stone-800 mb-2">¿Cancelar comanda?</h3>
             <p className="text-sm text-stone-500 mb-1">
-              Ticket #{confirmCancel.id} - {fmtHora(confirmCancel.creadoEn)}
+              {confirmCancel.servidorId ? `Ticket #${confirmCancel.servidorId}` : 'Comanda'} - {fmtHora(confirmCancel.creadoEn)}
               {confirmCancel.nombre ? ` · ${confirmCancel.nombre}` : ''}
             </p>
             <p className="text-sm text-stone-400 mb-5">
@@ -277,9 +280,9 @@ function TicketCardAbierta({
   onCargar,
   onCancelar,
 }: {
-  ticket: TicketResponse
-  onCargar: (t: TicketResponse) => void
-  onCancelar: (t: TicketResponse) => void
+  ticket: TicketLocal
+  onCargar: (t: TicketLocal) => void
+  onCancelar: (t: TicketLocal) => void
 }) {
   const totalItems = ticket.items.reduce((s, i) => s + i.cantidad, 0)
   const [imprimiendo, setImprimiendo] = useState(false)
@@ -303,10 +306,13 @@ function TicketCardAbierta({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-amber-700 truncate">
-              Ticket #{ticket.id} - {fmtHora(ticket.creadoEn)}
+              {ticket.servidorId ? `Ticket #${ticket.servidorId}` : 'Comanda local'} - {fmtHora(ticket.creadoEn)}
             </p>
             {ticket.nombre && (
               <p className="text-xs text-stone-500 truncate mt-0.5">{ticket.nombre}</p>
+            )}
+            {ticket.pendiente && (
+              <p className="text-[10px] text-amber-600 mt-0.5">Sin sincronizar</p>
             )}
           </div>
           <span className="flex-shrink-0 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
@@ -316,8 +322,9 @@ function TicketCardAbierta({
       </div>
 
       <div className="px-4 py-3 flex-1 space-y-1.5">
-        {ticket.items.slice(0, 4).map((item) => (
-          <div key={item.id} className="flex items-center justify-between gap-2 text-xs">
+        {/* Los items locales no tienen id del servidor: la clave sale del índice. */}
+        {ticket.items.slice(0, 4).map((item, idx) => (
+          <div key={`${item.productoId}-${idx}`} className="flex items-center justify-between gap-2 text-xs">
             <span className="text-stone-500 truncate">
               <span className="font-medium text-stone-700">{item.cantidad}×</span> {item.nombreProducto}
             </span>

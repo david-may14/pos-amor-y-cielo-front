@@ -463,6 +463,17 @@ export interface TicketItemRequest {
 }
 export interface CrearTicketRequest {
   nombre?: string | null
+  /** Generado por el dispositivo; permite reenviar sin duplicar. */
+  clientId?: string
+  items: TicketItemRequest[]
+}
+/** Estado completo de una comanda editada sin conexión. */
+export interface SincronizarTicketRequest {
+  clientId: string
+  nombre: string | null
+  estado: 'ABIERTO' | 'COBRADO' | 'CANCELADO'
+  actualizadoEn: string
+  ventaClientId?: string
   items: TicketItemRequest[]
 }
 export interface TicketModificadorResponse {
@@ -482,6 +493,8 @@ export interface TicketItemResponse {
 }
 export interface TicketResponse {
   id: number
+  /** Identificador del dispositivo; casa con la copia local. */
+  clientId: string | null
   nombre: string | null
   estado: 'ABIERTO' | 'COBRADO' | 'CANCELADO'
   ventaId: number | null

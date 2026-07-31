@@ -1,7 +1,9 @@
 import { esErrorDeRed } from '../api/client'
 import { listarProductosOffline, listarModificadoresProductoOffline } from '../api/productos'
 import { listarCategoriasOffline } from '../api/categorias'
-import { getDescuentoAplicableOffline, listarDescuentosTicketOffline } from '../api/descuentos'
+import {
+  getDescuentoAplicableOffline, listarDescuentosOffline, listarDescuentosTicketOffline,
+} from '../api/descuentos'
 import { offlineDb } from './offlineDb'
 import type { DescuentoView, ProductoDTO } from '../types/api'
 
@@ -40,6 +42,8 @@ async function ejecutarPrecarga(): Promise<boolean> {
       listarProductosOffline(),
       listarCategoriasOffline(),
       listarDescuentosTicketOffline().catch(() => [] as DescuentoView[]),
+      // Hacen falta al abrir una comanda guardada estando sin conexión.
+      listarDescuentosOffline().catch(() => [] as DescuentoView[]),
     ])
 
     await enLotes(productos, (p: ProductoDTO) => Promise.all([

@@ -1,7 +1,15 @@
 import { api } from './client'
 import type {
   TicketResponse, CrearTicketRequest, CobrarTicketRequest, VentaResponse,
+  SincronizarTicketRequest,
 } from '../types/api'
+
+/**
+ * Sube el estado completo de una comanda editada sin conexión. Idempotente por
+ * clientId: reenviarla no duplica nada.
+ */
+export const sincronizarTicket = (req: SincronizarTicketRequest) =>
+  api.put<TicketResponse>('/api/tickets/sync', req)
 
 export const listarTickets = (estado: 'ABIERTO' | 'COBRADO' | 'CANCELADO' = 'ABIERTO') =>
   api.get<TicketResponse[]>(`/api/tickets?estado=${estado}`)
