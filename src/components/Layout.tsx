@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { iniciarAutoSync, sincronizarPendientes, usePendientesCount } from '../db/offlineSales'
+import { iniciarPrecarga } from '../db/precargaCatalogo'
 
 interface NavItem {
   to: string
@@ -153,13 +154,18 @@ const navItems: NavItem[] = [
 ]
 
 export default function Layout() {
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, logout, bloquear, hayPin } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pendientes = usePendientesCount()
   const [sincronizando, setSincronizando] = useState(false)
 
-  useEffect(() => { iniciarAutoSync() }, [])
+  useEffect(() => {
+    iniciarAutoSync()
+    // Baja el catálogo completo apenas hay sesión, para poder vender offline
+    // aunque nunca se haya abierto Caja con internet.
+    iniciarPrecarga()
+  }, [])
 
   const handleSincronizar = async () => {
     setSincronizando(true)
@@ -170,9 +176,15 @@ export default function Layout() {
     }
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     navigate('/login')
+  }
+
+  // Bloquear conserva el PIN: se vuelve a entrar sin internet.
+  const handleBloquear = () => {
+    bloquear()
+    navigate('/desbloquear')
   }
 
   const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin)
@@ -215,6 +227,17 @@ export default function Layout() {
           <p className="text-sm font-medium text-cream truncate">{user?.nombre}</p>
           <p className="text-xs text-white/40">{user?.rol}</p>
         </div>
+        {hayPin && (
+          <button
+            onClick={handleBloquear}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+            </svg>
+            Bloquear
+          </button>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"

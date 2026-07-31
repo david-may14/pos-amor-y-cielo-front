@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import Spinner from '../components/Spinner'
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, hayPin } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,7 +20,8 @@ export default function LoginPage() {
     try {
       await login(email, password)
       sessionStorage.removeItem('session_expired')
-      navigate('/pos')
+      // Sin PIN guardado, ofrecerlo: es lo que permitirá entrar sin internet.
+      navigate(hayPin ? '/pos' : '/pin')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Credenciales incorrectas')
     } finally {
@@ -71,7 +72,7 @@ export default function LoginPage() {
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
-              La sesión dura 8 horas (un turno). Ingresa de nuevo para continuar.
+              No pudimos renovar la sesión de este dispositivo. Ingresa de nuevo para continuar.
             </div>
           )}
 

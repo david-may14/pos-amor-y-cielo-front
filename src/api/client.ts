@@ -1,20 +1,21 @@
 import { offlineDb } from '../db/offlineDb'
+import { NetworkError, esErrorDeRed } from './errores'
+import { getToken, limpiarSesion, renovarAccessToken } from './sesion'
+
+// Reexportados por comodidad: media app importa NetworkError desde aquí.
+export { NetworkError, esErrorDeRed } from './errores'
 
 const BASE_URL = import.meta.env.VITE_API_URL as string
 
-/** Se lanza cuando el fetch falla por falta de conexión (no por un error del servidor). */
-export class NetworkError extends Error {
-  constructor(message = 'Sin conexión') {
-    super(message)
-    this.name = 'NetworkError'
-  }
+/** Ruta a la que se manda al usuario cuando ya no hay forma de recuperar la sesión. */
+function expulsarAlLogin(): never {
+  limpiarSesion()
+  sessionStorage.setItem('session_expired', '1')
+  window.location.href = '/login'
+  throw new Error('Sesión expirada')
 }
 
-function getToken(): string | null {
-  return localStorage.getItem('pos_token')
-}
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, yaRenovado = false): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -30,15 +31,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (res.status === 401) {
-    localStorage.removeItem('pos_token')
-    localStorage.removeItem('pos_user')
-    sessionStorage.setItem('session_expired', '1')
-    window.location.href = '/login'
-    throw new Error('Sesión expirada')
+    // El access token caducó: intentamos renovarlo con el refresh token antes
+    // de dar la sesión por perdida. Solo se reintenta una vez.
+    if (!yaRenovado) {
+      const resultado = await renovarAccessToken()
+      if (resultado === 'ok') return request<T>(path, options, true)
+      // Sin red no sabemos si el refresh sigue sirviendo: no cerramos sesión.
+      if (resultado === 'sin-red') throw new NetworkError()
+    }
+    expulsarAlLogin()
   }
 
   if (!res.ok) {
-    const text = await res.text()
+    let text: string
+    try {
+      text = await res.text()
+    } catch {
+      // la conexión se cortó mientras leíamos el cuerpo
+      throw new NetworkError()
+    }
     let msg = text
     try {
       const json = JSON.parse(text)
@@ -48,7 +59,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (res.status === 204) return null as T
-  return res.json() as Promise<T>
+  try {
+    return await (res.json() as Promise<T>)
+  } catch (e) {
+    if (esErrorDeRed(e)) throw new NetworkError()
+    throw e
+  }
 }
 
 /**
@@ -61,9 +77,10 @@ async function getCached<T>(key: string, path: string): Promise<T> {
     offlineDb.cache.put({ key, data, actualizadoEn: new Date().toISOString() }).catch(() => {})
     return data
   } catch (e) {
-    if (e instanceof NetworkError) {
-      const entry = await offlineDb.cache.get(key)
+    if (esErrorDeRed(e)) {
+      const entry = await offlineDb.cache.get(key).catch(() => undefined)
       if (entry) return entry.data as T
+      throw new NetworkError()
     }
     throw e
   }

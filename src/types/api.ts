@@ -7,9 +7,13 @@ export type MetodoPago = 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA'
 export interface LoginRequest {
   email: string
   password: string
+  /** Etiqueta del equipo, para poder revocarlo desde el servidor. */
+  dispositivo?: string
 }
 export interface LoginResponse {
   token: string
+  /** Token de larga duración con el que se renueva el access token. */
+  refreshToken: string
   nombre: string
   rol: Rol
 }
