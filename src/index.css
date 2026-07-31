@@ -16,6 +16,15 @@
     color: #1a2410;
     font-family: 'Inter', system-ui, sans-serif;
   }
+  /*
+   * Sin esto el navegador retrasa cada toque para descartar que sea un
+   * doble toque de zoom. En una caja táctil eso se siente como que el
+   * primer toque "no hizo nada".
+   */
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
 }
 
 @layer utilities {

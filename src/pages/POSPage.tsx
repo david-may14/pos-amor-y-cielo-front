@@ -534,7 +534,16 @@ export default function POSPage() {
       {/* ── Productos ── */}
       <div className={`flex-1 flex flex-col overflow-hidden ${vistaMovil === 'carrito' ? 'hidden lg:flex' : 'flex'}`}>
         <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 flex items-center gap-1">
-          <div className="flex gap-1 overflow-x-auto">
+          {/*
+            overflow-y-hidden y touch-pan-x son deliberados: en CSS, poner
+            overflow-x en auto convierte también el eje Y en scrollable, y con
+            2-3 px de desbordamiento vertical por redondeo (depende del
+            device-pixel-ratio, por eso falla en unas pantallas y no en otras)
+            el navegador retiene el primer toque para decidir si es scroll.
+            Resultado: hay que tocar dos veces. Fijando el eje Y no hay nada
+            que decidir.
+          */}
+          <div className="flex gap-1 overflow-x-auto overflow-y-hidden touch-pan-x">
             {['Todos', ...categorias.map((c) => c.nombre)].map((cat) => (
               <button
                 key={cat}
