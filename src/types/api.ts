@@ -16,6 +16,8 @@ export interface LoginResponse {
   refreshToken: string
   nombre: string
   rol: Rol
+  /** Si el usuario ya definió un PIN (vive en el servidor, no en el dispositivo). */
+  tienePin: boolean
 }
 
 // ─── Usuarios ─────────────────────────────────────────────────────────────────

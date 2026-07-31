@@ -21,6 +21,7 @@ import EquilibrioPage from './pages/EquilibrioPage'
 import CosteoPage from './pages/CosteoPage'
 import DesbloquearPage from './pages/DesbloquearPage'
 import CrearPinPage from './pages/CrearPinPage'
+import ActivarPinPage from './pages/ActivarPinPage'
 
 function RequireAuth() {
   const { user, hayPin } = useAuth()
@@ -43,6 +44,7 @@ export default function App() {
 
       <Route element={<RequireAuth />}>
         <Route path="/pin" element={<CrearPinPage />} />
+        <Route path="/pin/activar" element={<ActivarPinPage />} />
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/pos" replace />} />
           <Route path="/pos" element={<POSPage />} />

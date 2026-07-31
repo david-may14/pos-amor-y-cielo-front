@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { login as apiLogin, revocarSesionRemota } from '../api/auth'
+import { definirPin, verificarPin } from '../api/pin'
 import {
   getPerfil, getRefreshToken, guardarSesion, limpiarSesion,
   renovarAccessToken, restaurarSesionDesdePin,
@@ -18,16 +19,20 @@ interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null
   isAdmin: boolean
-  /** null mientras se consulta IndexedDB al arrancar. */
+  /** Si este dispositivo tiene la sesión armada con PIN. null mientras se consulta IndexedDB. */
   hayPin: boolean | null
-  login: (email: string, password: string) => Promise<void>
-  /** Cierra sesión de verdad: revoca en el servidor y borra el PIN. */
+  /** Si el usuario ya definió un PIN en el servidor (lo dice el login). */
+  usuarioTienePin: boolean
+  login: (email: string, password: string) => Promise<{ tienePin: boolean }>
+  /** Cierra sesión de verdad: revoca en el servidor y desarma este dispositivo. */
   logout: () => Promise<void>
   /** Bloqueo local: conserva el PIN para poder volver a entrar sin internet. */
   bloquear: () => void
   desbloquear: (pin: string) => Promise<ResultadoDesbloqueo>
-  /** Guarda un PIN para la sesión actual. */
-  crearPin: (pin: string) => Promise<void>
+  /** Crea el PIN en el servidor y arma este dispositivo con él. */
+  crearPin: (pin: string, password: string) => Promise<void>
+  /** El usuario ya tiene PIN: lo verifica contra el servidor y arma este dispositivo. */
+  activarPin: (pin: string) => Promise<void>
   quitarPin: () => Promise<void>
 }
 
@@ -36,6 +41,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => getPerfil())
   const [hayPin, setHayPin] = useState<boolean | null>(null)
+  const [usuarioTienePin, setUsuarioTienePin] = useState(false)
 
   const refrescarHayPin = useCallback(() => {
     tienePin().then(setHayPin).catch(() => setHayPin(false))
@@ -46,6 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const data = await apiLogin({ email, password })
     setUser(guardarSesion(data))
+    setUsuarioTienePin(data.tienePin)
+    return { tienePin: data.tienePin }
+  }, [])
+
+  /** Cifra la sesión de este dispositivo con el PIN ya validado. */
+  const armarDispositivo = useCallback(async (pin: string, perfil: AuthUser) => {
+    const refreshToken = getRefreshToken()
+    if (!refreshToken) throw new Error('No hay sesión activa para proteger con PIN')
+    await configurarPin(pin, { refreshToken, nombre: perfil.nombre, rol: perfil.rol })
+    setHayPin(true)
   }, [])
 
   const logout = useCallback(async () => {
@@ -76,13 +92,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res
   }, [])
 
-  const crearPin = useCallback(async (pin: string) => {
-    const refreshToken = getRefreshToken()
-    if (!refreshToken) throw new Error('No hay sesión activa para proteger con PIN')
+  const crearPin = useCallback(async (pin: string, password: string) => {
     if (!user) throw new Error('No hay usuario en sesión')
-    await configurarPin(pin, { refreshToken, nombre: user.nombre, rol: user.rol })
-    setHayPin(true)
-  }, [user])
+    await definirPin(password, pin)   // queda en el servidor, ligado al usuario
+    await armarDispositivo(pin, user) // y cifra la sesión local con él
+    setUsuarioTienePin(true)
+  }, [user, armarDispositivo])
+
+  const activarPin = useCallback(async (pin: string) => {
+    if (!user) throw new Error('No hay usuario en sesión')
+    // Verificar antes de cifrar: si se teclea mal, la sesión local quedaría
+    // cifrada con un PIN que el usuario no conoce y nunca podría abrirla.
+    await verificarPin(pin)
+    await armarDispositivo(pin, user)
+  }, [user, armarDispositivo])
 
   const quitarPin = useCallback(async () => {
     await borrarPin()
@@ -91,8 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, isAdmin: user?.rol === 'ADMIN', hayPin,
-      login, logout, bloquear, desbloquear, crearPin, quitarPin,
+      user, isAdmin: user?.rol === 'ADMIN', hayPin, usuarioTienePin,
+      login, logout, bloquear, desbloquear, crearPin, activarPin, quitarPin,
     }}>
       {children}
     </AuthContext.Provider>

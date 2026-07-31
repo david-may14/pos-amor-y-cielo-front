@@ -18,10 +18,15 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      const { tienePin } = await login(email, password)
       sessionStorage.removeItem('session_expired')
-      // Sin PIN guardado, ofrecerlo: es lo que permitirá entrar sin internet.
-      navigate(hayPin ? '/pos' : '/pin')
+      if (hayPin) {
+        navigate('/pos')                                  // equipo ya armado
+      } else if (tienePin) {
+        navigate('/pin/activar')                          // el PIN ya existe: solo teclearlo
+      } else {
+        navigate('/pin', { state: { password } })         // aún no tiene PIN: crearlo
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Credenciales incorrectas')
     } finally {
