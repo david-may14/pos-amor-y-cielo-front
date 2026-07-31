@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { offlineDb, type VentaPendiente } from './offlineDb'
 import { crearVenta } from '../api/ventas'
-import { NetworkError } from '../api/client'
+import { esErrorDeRed } from '../api/client'
 import type { ItemRequest, MetodoPago } from '../types/api'
 
 export interface NuevaVentaPendiente {
@@ -46,7 +46,7 @@ export async function sincronizarPendientes(): Promise<{ sincronizadas: number; 
       await offlineDb.ventasPendientes.delete(p.clientId)
       sincronizadas++
     } catch (e) {
-      if (e instanceof NetworkError) break
+      if (esErrorDeRed(e)) break
       conError++
       await offlineDb.ventasPendientes.update(p.clientId, {
         intentos: p.intentos + 1,

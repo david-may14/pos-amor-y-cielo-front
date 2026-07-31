@@ -10,7 +10,7 @@ import { imprimirRecibo } from '../services/printer/recibo'
 import { isPrinterAvailable } from '../services/printer/connection'
 import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
-import { NetworkError } from '../api/client'
+import { esErrorDeRed } from '../api/client'
 import { encolarVenta } from '../db/offlineSales'
 import type {
   ProductoDTO, Categoria, VentaResponse, MetodoPago, ModificadorGrupo, DescuentoView,
@@ -175,7 +175,14 @@ export default function POSPage() {
       setCategorias(cats.sort((a, b) => a.orden - b.orden))
       setDescuentosTicket(dticket)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error al cargar')
+      if (esErrorDeRed(e)) {
+        setError(
+          'Sin conexión y este dispositivo todavía no tiene el catálogo descargado. ' +
+          'Conéctate a internet una vez y se guardará solo para poder vender offline después.',
+        )
+      } else {
+        setError(e instanceof Error ? e.message : 'Error al cargar')
+      }
     } finally {
       setLoading(false)
     }
@@ -444,7 +451,7 @@ export default function POSPage() {
         try {
           venta = await crearVenta(items, metodoPago, descuentoTicketId, propinaFinal || undefined)
         } catch (e) {
-          if (!(e instanceof NetworkError)) throw e
+          if (!esErrorDeRed(e)) throw e
           const pendiente = await encolarVenta({ items, metodoPago, descuentoTicketId, propina: propinaFinal })
           venta = ventaPendienteAVentaResponse({
             clientId: pendiente.clientId,
@@ -627,7 +634,15 @@ export default function POSPage() {
 
         <div className="flex-1 overflow-y-auto p-4 pt-2">
           {error && (
-            <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">{error}</div>
+            <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 flex items-start justify-between gap-3">
+              <span>{error}</span>
+              <button
+                onClick={() => { setError(''); cargar() }}
+                className="flex-shrink-0 font-medium text-red-800 bg-red-100 hover:bg-red-200 border border-red-300 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                Reintentar
+              </button>
+            </div>
           )}
           {filteredProductos.length === 0 ? (
             <div className="flex items-center justify-center h-40 text-stone-400 text-sm">
