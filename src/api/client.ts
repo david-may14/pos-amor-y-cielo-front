@@ -86,6 +86,67 @@ async function getCached<T>(key: string, path: string): Promise<T> {
   }
 }
 
+/**
+ * Como request(), pero devuelve la Response en crudo. La necesitan la descarga
+ * de CSV (blob) y la importación (FormData), que no pueden pasar por el wrapper
+ * JSON pero sí deben compartir su manejo de sesión y de red.
+ */
+async function peticionCruda(path: string, init: RequestInit, yaRenovado = false): Promise<Response> {
+  const token = getToken()
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(init.headers as Record<string, string> | undefined),
+  }
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { ...init, headers })
+  } catch {
+    throw new NetworkError()
+  }
+
+  if (res.status === 401) {
+    if (!yaRenovado) {
+      const resultado = await renovarAccessToken()
+      if (resultado === 'ok') return peticionCruda(path, init, true)
+      if (resultado === 'sin-red') throw new NetworkError()
+    }
+    expulsarAlLogin()
+  }
+
+  if (!res.ok) {
+    let text = ''
+    try {
+      text = await res.text()
+    } catch {
+      throw new NetworkError()
+    }
+    throw new Error(text || `Error ${res.status}`)
+  }
+
+  return res
+}
+
+/** Descarga un archivo del servidor y lo ofrece al usuario. */
+export async function descargarArchivo(path: string, nombreArchivo: string): Promise<void> {
+  const res = await peticionCruda(path, {})
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nombreArchivo
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Sube un archivo como multipart. No fija Content-Type: el boundary lo pone el navegador. */
+export async function subirArchivo<T>(path: string, file: File): Promise<T> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await peticionCruda(path, { method: 'POST', body: form })
+  return res.json() as Promise<T>
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   getCached: <T>(key: string, path: string) => getCached<T>(key, path),
