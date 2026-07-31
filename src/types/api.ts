@@ -374,6 +374,7 @@ export interface VentaResponse {
   splitGrupo?: string | null
   usuarioId?: number | null
   usuarioNombre?: string | null
+  clientId?: string | null
 }
 export interface ResumenDia {
   fecha: string

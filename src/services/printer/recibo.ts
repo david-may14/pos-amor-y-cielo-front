@@ -22,7 +22,7 @@ export async function construirRecibo(venta: VentaResponse): Promise<Uint8Array>
   await imprimirEncabezado(b)
 
   b.divider()
-  b.line(`Venta #${venta.id}`)
+  b.line(venta.id ? `Venta #${venta.id}` : 'Venta (pendiente de sincronizar)')
   b.line(fmtFecha(venta.creadaEn))
   if (venta.usuarioNombre) b.line(`Atendió: ${venta.usuarioNombre}`)
   b.divider()

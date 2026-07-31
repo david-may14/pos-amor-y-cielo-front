@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { listarProductos, listarModificadoresProducto } from '../api/productos'
-import { listarCategorias } from '../api/categorias'
+import { listarProductosOffline, listarModificadoresProductoOffline } from '../api/productos'
+import { listarCategoriasOffline } from '../api/categorias'
 import { crearVenta } from '../api/ventas'
-import { getDescuentoAplicable, listarDescuentos, listarDescuentosTicket } from '../api/descuentos'
+import { getDescuentoAplicableOffline, listarDescuentos, listarDescuentosTicketOffline } from '../api/descuentos'
 import { detalleTicket, crearTicket, actualizarTicket, cobrarTicket } from '../api/tickets'
 import { obtenerEquilibrio } from '../api/equilibrio'
 import { imprimirRecibo } from '../services/printer/recibo'
 import { isPrinterAvailable } from '../services/printer/connection'
 import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
+import { NetworkError } from '../api/client'
+import { encolarVenta } from '../db/offlineSales'
 import type {
   ProductoDTO, Categoria, VentaResponse, MetodoPago, ModificadorGrupo, DescuentoView,
   TicketResponse, TicketItemRequest, EquilibrioDTO,
@@ -75,6 +77,49 @@ const descuentoMontoItem = (item: CartItem): number => {
 const fmtDescuento = (d: DescuentoView | CartDiscount) =>
   d.tipo === 'PORCENTAJE' ? `${d.valor}%` : fmt(d.valor)
 
+/** Estado sintético usado solo del lado del cliente para ventas guardadas offline. */
+const ESTADO_PENDIENTE_SYNC = 'PENDIENTE_SYNC'
+
+/** Construye un VentaResponse "de mentira" a partir del carrito, para poder mostrar
+ * el recibo e imprimirlo aunque la venta real todavía no exista en el servidor. */
+function ventaPendienteAVentaResponse(args: {
+  clientId: string
+  ocurrioEn: string
+  metodoPago: MetodoPago
+  cart: CartItem[]
+  total: number
+  descuentoTicket: DescuentoView | null
+  descuentoTicketMonto: number
+  propina: number
+}): VentaResponse {
+  const { clientId, ocurrioEn, metodoPago, cart, total, descuentoTicket, descuentoTicketMonto, propina } = args
+  return {
+    id: 0,
+    total,
+    costoTotal: 0,
+    propina,
+    ivaMonto: 0,
+    comisionMonto: 0,
+    estado: ESTADO_PENDIENTE_SYNC,
+    metodoPago,
+    creadaEn: ocurrioEn,
+    items: cart.map((i) => ({
+      nombreProducto: i.nombre,
+      cantidad: i.cantidad,
+      precioUnitario: i.precioUnitario,
+      costoUnitario: 0,
+      notas: i.notas || null,
+      modificadores: i.mods.map((m) => ({ nombre: m.nombre, precioExtra: m.precioExtra })),
+      descuentoNombre: i.descuento?.nombre ?? null,
+      descuentoMonto: i.descuento ? descuentoMontoItem(i) : null,
+    })),
+    descuentoTicketNombre: descuentoTicket?.nombre ?? null,
+    descuentoTicketMonto: descuentoTicketMonto > 0 ? descuentoTicketMonto : null,
+    splitGrupo: null,
+    clientId,
+  }
+}
+
 export default function POSPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -122,9 +167,9 @@ export default function POSPage() {
     setLoading(true)
     try {
       const [prods, cats, dticket] = await Promise.all([
-        listarProductos(),
-        listarCategorias(),
-        listarDescuentosTicket().catch(() => [] as DescuentoView[]),
+        listarProductosOffline(),
+        listarCategoriasOffline(),
+        listarDescuentosTicketOffline().catch(() => [] as DescuentoView[]),
       ])
       setProductos(prods)
       setCategorias(cats.sort((a, b) => a.orden - b.orden))
@@ -258,8 +303,8 @@ export default function POSPage() {
     setLoadingMods((prev) => new Set(prev).add(producto.id))
     try {
       const [grupos, descuentoAplicable] = await Promise.all([
-        listarModificadoresProducto(producto.id),
-        getDescuentoAplicable(producto.id).catch(() => null),
+        listarModificadoresProductoOffline(producto.id),
+        getDescuentoAplicableOffline(producto.id).catch(() => null),
       ])
       setModModal({ producto, grupos, seleccion: {}, descuentoAplicable, descuentoActivo: !!descuentoAplicable, cantidad: 1 })
       setModError('')
@@ -394,7 +439,24 @@ export default function POSPage() {
           ...(i.mods.length > 0 ? { modificadorOpcionIds: i.mods.map((m) => m.opcionId) } : {}),
           ...(i.descuento ? { descuentoId: i.descuento.descuentoId } : {}),
         }))
-        venta = await crearVenta(items, metodoPago, descuentoTicket?.id ?? null, propinaNum > 0 ? propinaNum : undefined)
+        const descuentoTicketId = descuentoTicket?.id ?? null
+        const propinaFinal = propinaNum > 0 ? propinaNum : 0
+        try {
+          venta = await crearVenta(items, metodoPago, descuentoTicketId, propinaFinal || undefined)
+        } catch (e) {
+          if (!(e instanceof NetworkError)) throw e
+          const pendiente = await encolarVenta({ items, metodoPago, descuentoTicketId, propina: propinaFinal })
+          venta = ventaPendienteAVentaResponse({
+            clientId: pendiente.clientId,
+            ocurrioEn: pendiente.ocurrioEn,
+            metodoPago,
+            cart,
+            total,
+            descuentoTicket,
+            descuentoTicketMonto,
+            propina: propinaFinal,
+          })
+        }
       }
       if (metodoPago === 'EFECTIVO' && isPrinterAvailable()) {
         abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
@@ -1167,11 +1229,17 @@ export default function POSPage() {
       {ventaExitosa && (
         <Modal title="Venta registrada" onClose={() => setVentaExitosa(null)} size="sm">
           <div className="space-y-4">
-            <div className="flex items-center gap-3 bg-green-50 rounded-xl p-4">
-              <span className="text-2xl">✓</span>
+            <div className={`flex items-center gap-3 rounded-xl p-4 ${
+              ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'bg-amber-50' : 'bg-green-50'
+            }`}>
+              <span className="text-2xl">{ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? '⏳' : '✓'}</span>
               <div>
-                <p className="font-semibold text-green-800">Venta #{ventaExitosa.id}</p>
-                <p className="text-sm text-green-600">{ventaExitosa.metodoPago}</p>
+                <p className={`font-semibold ${ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'text-amber-800' : 'text-green-800'}`}>
+                  {ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'Venta guardada (sin conexión)' : `Venta #${ventaExitosa.id}`}
+                </p>
+                <p className={`text-sm ${ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'text-amber-600' : 'text-green-600'}`}>
+                  {ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'Se sincronizará sola al recuperar internet' : ventaExitosa.metodoPago}
+                </p>
               </div>
             </div>
 

@@ -28,5 +28,14 @@ export const quitarProducto = (id: number, prodId: number) =>
 export const getDescuentoAplicable = (productoId: number) =>
   api.get<DescuentoView | null>(`/api/descuentos/aplicable/producto/${productoId}`)
 
+export const getDescuentoAplicableOffline = (productoId: number) =>
+  api.getCached<DescuentoView | null>(
+    `descuentoAplicable:${productoId}`,
+    `/api/descuentos/aplicable/producto/${productoId}`,
+  )
+
 export const listarDescuentosTicket = () =>
   api.get<DescuentoView[]>('/api/descuentos/ticket-activos')
+
+export const listarDescuentosTicketOffline = () =>
+  api.getCached<DescuentoView[]>('descuentosTicket', '/api/descuentos/ticket-activos')

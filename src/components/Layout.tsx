@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { iniciarAutoSync, sincronizarPendientes, usePendientesCount } from '../db/offlineSales'
 
 interface NavItem {
   to: string
@@ -155,6 +156,19 @@ export default function Layout() {
   const { user, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const pendientes = usePendientesCount()
+  const [sincronizando, setSincronizando] = useState(false)
+
+  useEffect(() => { iniciarAutoSync() }, [])
+
+  const handleSincronizar = async () => {
+    setSincronizando(true)
+    try {
+      await sincronizarPendientes()
+    } finally {
+      setSincronizando(false)
+    }
+  }
 
   const handleLogout = () => {
     logout()
@@ -256,6 +270,22 @@ export default function Layout() {
             style={{ height: '28px', width: 'auto' }}
           />
         </header>
+
+        {pendientes > 0 && (
+          <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
+            <span>
+              {pendientes} venta{pendientes !== 1 ? 's' : ''} pendiente{pendientes !== 1 ? 's' : ''} de sincronizar
+              — se guardaron sin conexión y aún no aparecen en reportes ni analytics.
+            </span>
+            <button
+              onClick={handleSincronizar}
+              disabled={sincronizando}
+              className="flex-shrink-0 font-medium text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {sincronizando ? 'Sincronizando…' : 'Reintentar ahora'}
+            </button>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
           <Outlet />

@@ -6,6 +6,10 @@ export const detalleCosteo = (id: number) => api.get<CosteoDTO>(`/api/productos/
 
 export const listarProductos = () => api.get<ProductoDTO[]>('/api/productos')
 
+/** Para la caja (POSPage): cachea el catálogo para poder vender sin conexión. */
+export const listarProductosOffline = () =>
+  api.getCached<ProductoDTO[]>('productos', '/api/productos')
+
 export const crearProducto = (data: ProductoRequest) =>
   api.post<ProductoDTO>('/api/productos', data)
 
@@ -23,6 +27,10 @@ export const reemplazarReceta = (id: number, lineas: RecetaLineaRequest[]) =>
 
 export const listarModificadoresProducto = (id: number) =>
   api.get<ModificadorGrupo[]>(`/api/productos/${id}/modificadores`)
+
+/** Cachea por producto: solo estará disponible offline si ya se consultó una vez con conexión. */
+export const listarModificadoresProductoOffline = (id: number) =>
+  api.getCached<ModificadorGrupo[]>(`modificadores:${id}`, `/api/productos/${id}/modificadores`)
 
 export const asignarModificador = (productoId: number, grupoId: number) =>
   api.post<null>(`/api/productos/${productoId}/modificadores/${grupoId}`, {})
