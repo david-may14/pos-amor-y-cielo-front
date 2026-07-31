@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { iniciarAutoSync, sincronizarPendientes, usePendientesCount } from '../db/offlineSales'
 import { iniciarPrecarga } from '../db/precargaCatalogo'
+import { useVersionApp } from '../hooks/useVersionApp'
 
 interface NavItem {
   to: string
@@ -159,6 +160,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pendientes = usePendientesCount()
   const [sincronizando, setSincronizando] = useState(false)
+  const version = useVersionApp()
 
   useEffect(() => {
     iniciarAutoSync()
@@ -226,6 +228,11 @@ export default function Layout() {
         <div className="px-3 py-2 mb-1">
           <p className="text-sm font-medium text-cream truncate">{user?.nombre}</p>
           <p className="text-xs text-white/40">{user?.rol}</p>
+          {version && (
+            <p className="text-[10px] text-white/25 mt-1 font-mono" title={version.commit ?? ''}>
+              v{version.version} · {version.build}
+            </p>
+          )}
         </div>
         {hayPin && (
           <button
