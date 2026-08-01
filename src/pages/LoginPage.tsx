@@ -46,7 +46,7 @@ export default function LoginPage() {
         />
         <div className="h-px w-10 bg-cream/20" />
         <p className="text-cream/30 text-xs tracking-[0.18em] uppercase text-center leading-relaxed">
-          Mérida, Yucatán<br />Lunes a sábado · 5:30 – 10:00 pm
+          Mérida, Yucatán<br />Lunes a viernes · 5:30 – 10:00 pm
         </p>
       </div>
 
