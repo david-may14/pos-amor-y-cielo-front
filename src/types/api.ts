@@ -329,6 +329,9 @@ export interface TurnoDTO {
   cerradoEn: string | null
   conteoEfectivo: number | null
   ventasEfectivo: number | null
+  ventasTarjeta: number | null
+  propinaEfectivo: number | null
+  propinaTarjeta: number | null
   movimientosNeto: number | null
   efectivoEsperado: number | null
   diferencia: number | null

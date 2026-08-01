@@ -13,6 +13,7 @@ import { imprimirRecibo } from '../services/printer/recibo'
 import { isPrinterAvailable } from '../services/printer/connection'
 import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
+import { useTurno } from '../contexts/TurnoContext'
 import { esErrorDeRed } from '../api/client'
 import { encolarVenta } from '../db/offlineSales'
 import type {
@@ -127,6 +128,7 @@ export default function POSPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
+  const { turno, loading: turnoLoading } = useTurno()
   const [productos, setProductos] = useState<ProductoDTO[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
@@ -317,6 +319,10 @@ export default function POSPage() {
   }
 
   const handleProductoClick = async (producto: ProductoDTO) => {
+    if (!turno) {
+      setError('Abre el turno en la pestaña "Turno" antes de vender.')
+      return
+    }
     setLoadingMods((prev) => new Set(prev).add(producto.id))
     try {
       const [grupos, descuentoAplicable] = await Promise.all([
@@ -432,6 +438,10 @@ export default function POSPage() {
 
   const handleCobrar = async () => {
     if (cart.length === 0) return
+    if (!turno) {
+      setError('Abre el turno en la pestaña "Turno" antes de cobrar.')
+      return
+    }
     setSubmitting(true)
     setError('')
     try {
@@ -632,6 +642,21 @@ export default function POSPage() {
           </div>
         )}
 
+        {!turnoLoading && !turno && (
+          <div className="flex-shrink-0 mx-4 mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-800">No hay turno abierto</p>
+              <p className="text-xs text-amber-600">Abre el turno para poder registrar ventas.</p>
+            </div>
+            <button
+              onClick={() => navigate('/caja')}
+              className="flex-shrink-0 text-xs font-medium text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3 py-2 rounded-lg transition-colors"
+            >
+              Abrir turno
+            </button>
+          </div>
+        )}
+
         <div className="flex-shrink-0 px-4 pt-3 pb-2">
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -678,10 +703,10 @@ export default function POSPage() {
                   <button
                     key={p.id}
                     onClick={() => handleProductoClick(p)}
-                    disabled={isLoadingMod}
+                    disabled={isLoadingMod || !turno}
                     className={`card text-left p-4 hover:shadow-md hover:border-forest/30 transition-all active:scale-95 ${
                       cantEnCart > 0 ? 'ring-2 ring-forest/40 border-forest/20' : ''
-                    } ${isLoadingMod ? 'opacity-60 cursor-wait' : ''}`}
+                    } ${isLoadingMod ? 'opacity-60 cursor-wait' : ''} ${!turno ? 'opacity-50 cursor-not-allowed active:scale-100' : ''}`}
                   >
                     {isLoadingMod ? (
                       <Spinner className="w-4 h-4 text-forest mb-2" />
@@ -1060,7 +1085,8 @@ export default function POSPage() {
             </button>
             <button
               onClick={handleCobrar}
-              disabled={cart.length === 0 || submitting}
+              disabled={cart.length === 0 || submitting || !turno}
+              title={!turno ? 'Abre el turno antes de cobrar' : undefined}
               className="btn-primary flex-1 py-3 text-base flex items-center justify-center gap-2"
             >
               {submitting && <Spinner className="w-4 h-4 text-cream" />}

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { obtenerTurnoActivo, abrirTurno, cerrarTurno, listarTurnos, registrarMovimiento } from '../api/turnos'
+import { abrirTurno, cerrarTurno, listarTurnos, registrarMovimiento } from '../api/turnos'
 import type { TurnoDTO } from '../types/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useTurno } from '../contexts/TurnoContext'
 import Spinner from '../components/Spinner'
 
 const fmt = (n: number) =>
@@ -17,9 +18,8 @@ const hoy = () => new Date().toISOString().split('T')[0]
 
 export default function CajaPage() {
   const { isAdmin } = useAuth()
+  const { turno: turnoActivo, loading: loadingActivo, actualizarTurno } = useTurno()
 
-  const [turnoActivo, setTurnoActivo] = useState<TurnoDTO | null>(null)
-  const [loadingActivo, setLoadingActivo] = useState(true)
   const [error, setError] = useState('')
 
   // Apertura
@@ -43,18 +43,6 @@ export default function CajaPage() {
   const [historial, setHistorial] = useState<TurnoDTO[]>([])
   const [loadingHist, setLoadingHist] = useState(false)
 
-  const cargarActivo = useCallback(async () => {
-    setLoadingActivo(true)
-    try {
-      const t = await obtenerTurnoActivo()
-      setTurnoActivo(t)
-    } catch {
-      setTurnoActivo(null)
-    } finally {
-      setLoadingActivo(false)
-    }
-  }, [])
-
   const cargarHistorial = useCallback(async () => {
     if (!isAdmin) return
     setLoadingHist(true)
@@ -67,7 +55,6 @@ export default function CajaPage() {
     }
   }, [fecha, isAdmin])
 
-  useEffect(() => { cargarActivo() }, [cargarActivo])
   useEffect(() => { cargarHistorial() }, [cargarHistorial])
 
   const handleAbrir = async () => {
@@ -76,7 +63,7 @@ export default function CajaPage() {
     setError('')
     try {
       const t = await abrirTurno(fondo)
-      setTurnoActivo(t)
+      actualizarTurno(t)
       setFondoInicial('')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al abrir turno')
@@ -92,7 +79,7 @@ export default function CajaPage() {
     setError('')
     try {
       const t = await cerrarTurno(conteo, notasCierre || undefined)
-      setTurnoActivo(null)
+      actualizarTurno(null)
       setMostraCierre(false)
       setConteoEfectivo('')
       setNotasCierre('')
@@ -114,7 +101,7 @@ export default function CajaPage() {
     setError('')
     try {
       const t = await registrarMovimiento(tipoMovimiento, monto, motivoMovimiento.trim())
-      setTurnoActivo(t)
+      actualizarTurno(t)
       setTipoMovimiento(null)
       setMontoMovimiento('')
       setMotivoMovimiento('')
@@ -211,6 +198,25 @@ export default function CajaPage() {
               <div className="text-center">
                 <p className="text-xs text-stone-400 mb-1">Efectivo esperado</p>
                 <p className="font-semibold text-stone-700">{fmt(efectivoEsperado)}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-stone-100 pt-4 mt-4">
+              <div className="text-center">
+                <p className="text-xs text-stone-400 mb-1">Ventas efectivo</p>
+                <p className="font-semibold text-stone-700">{fmt(turnoActivo.ventasEfectivo ?? 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-stone-400 mb-1">Ventas tarjeta</p>
+                <p className="font-semibold text-stone-700">{fmt(turnoActivo.ventasTarjeta ?? 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-stone-400 mb-1">Propina efectivo</p>
+                <p className="font-semibold text-stone-700">{fmt(turnoActivo.propinaEfectivo ?? 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-stone-400 mb-1">Propina tarjeta</p>
+                <p className="font-semibold text-stone-700">{fmt(turnoActivo.propinaTarjeta ?? 0)}</p>
               </div>
             </div>
 
@@ -344,6 +350,12 @@ export default function CajaPage() {
               <span>Ventas en efectivo</span>
               <span>+{fmt(turnoActivo.ventasEfectivo ?? 0)}</span>
             </div>
+            {(turnoActivo.propinaEfectivo ?? 0) > 0 && (
+              <div className="flex justify-between text-stone-500">
+                <span>Propina en efectivo</span>
+                <span>+{fmt(turnoActivo.propinaEfectivo ?? 0)}</span>
+              </div>
+            )}
             {(turnoActivo.movimientosNeto ?? 0) !== 0 && (
               <div className="flex justify-between text-stone-500">
                 <span>Movimientos de caja</span>
@@ -472,6 +484,21 @@ export default function CajaPage() {
                         <p className={`font-semibold ${diff > 0 ? 'text-blue-600' : diff < 0 ? 'text-red-500' : 'text-green-600'}`}>
                           {t.diferencia != null ? (diff >= 0 ? '+' : '') + fmt(diff) : '—'}
                         </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-xs mt-2 pt-2 border-t border-stone-50">
+                      <div>
+                        <p className="text-stone-400">Ventas tarjeta</p>
+                        <p className="font-medium text-stone-700">{t.ventasTarjeta != null ? fmt(t.ventasTarjeta) : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-stone-400">Propina efectivo</p>
+                        <p className="font-medium text-stone-700">{t.propinaEfectivo != null ? fmt(t.propinaEfectivo) : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-stone-400">Propina tarjeta</p>
+                        <p className="font-medium text-stone-700">{t.propinaTarjeta != null ? fmt(t.propinaTarjeta) : '—'}</p>
                       </div>
                     </div>
 
