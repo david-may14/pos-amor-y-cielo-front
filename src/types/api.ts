@@ -342,6 +342,24 @@ export interface TurnoDTO {
   movimientos: MovimientoCajaDTO[]
 }
 
+// ─── Cierre mensual ─────────────────────────────────────────────────────────
+export interface CierreMensualDTO {
+  id: number | null
+  anio: number
+  mes: number
+  usuarioNombre: string | null
+  cerradoEn: string | null
+  ventasEfectivo: number
+  ventasTarjeta: number
+  propinaEfectivo: number
+  propinaTarjeta: number
+  costoTotal: number
+  gastosFijos: number
+  utilidadNeta: number
+  ventasCount: number
+  notas: string | null
+}
+
 // ─── Configuración ────────────────────────────────────────────────────────────
 export interface ConfiguracionDTO {
   ivaPorcentaje: number

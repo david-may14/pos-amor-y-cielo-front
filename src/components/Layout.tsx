@@ -7,6 +7,7 @@ import { iniciarPrecarga } from '../db/precargaCatalogo'
 import { iniciarAutoSyncTickets } from '../db/offlineTickets'
 import { useVersionApp } from '../hooks/useVersionApp'
 import { useEsHoraDeCierre } from '../hooks/useHoraCierre'
+import { useCierreMensualPendiente } from '../hooks/useCierreMensual'
 
 interface NavItem {
   to: string
@@ -166,6 +167,7 @@ export default function Layout() {
   const version = useVersionApp()
   const { turno } = useTurno()
   const esHoraDeCierre = useEsHoraDeCierre()
+  const cierreMensualPendiente = useCierreMensualPendiente(isAdmin)
 
   useEffect(() => {
     iniciarAutoSync()
@@ -310,6 +312,18 @@ export default function Layout() {
         {turno && esHoraDeCierre && (
           <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-red-50 border-b border-red-200 text-xs text-red-800">
             <span>Ya son más de las 10:00 pm — recuerda cerrar el turno.</span>
+            <button
+              onClick={() => navigate('/caja')}
+              className="flex-shrink-0 font-medium text-red-900 bg-red-100 hover:bg-red-200 border border-red-300 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              Ir a Turno
+            </button>
+          </div>
+        )}
+
+        {cierreMensualPendiente && (
+          <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-red-50 border-b border-red-200 text-xs text-red-800">
+            <span>Falta cerrar el mes de {cierreMensualPendiente.nombreMes}.</span>
             <button
               onClick={() => navigate('/caja')}
               className="flex-shrink-0 font-medium text-red-900 bg-red-100 hover:bg-red-200 border border-red-300 px-2.5 py-1 rounded-lg transition-colors"
