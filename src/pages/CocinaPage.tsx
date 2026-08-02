@@ -9,6 +9,7 @@ import ElapsedSince from '../components/ElapsedSince'
 import Modal from '../components/Modal'
 import TecladoPin from '../components/TecladoPin'
 import Spinner from '../components/Spinner'
+import PullToRefresh from '../components/PullToRefresh'
 
 /**
  * Pantalla de cocina. Se abre desde el login sin iniciar sesión y se queda
@@ -116,12 +117,15 @@ export default function CocinaPage() {
         </Link>
       </header>
 
-      {fallo ? (
+      {/* El gesto envuelve también los estados vacíos: cuando no hay nada en
+          pantalla es justo cuando uno quiere tirar para ver si ya llegó algo. */}
+      <PullToRefresh onRefresh={refrescar} className="flex-1">
+        {fallo ? (
         <Fallo mensaje={fallo} onReintentar={refrescar} />
       ) : !estado.turnoAbierto ? (
         <SinTurno />
       ) : (
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 overflow-y-auto">
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
           <Columna titulo="Por preparar" vacio="Nada pendiente" comandas={porHacer}>
             {c => (
               <button
@@ -166,7 +170,8 @@ export default function CocinaPage() {
             </section>
           )}
         </main>
-      )}
+        )}
+      </PullToRefresh>
 
       {aRevertir && (
         <ModalRevertir
@@ -181,7 +186,7 @@ export default function CocinaPage() {
 
 function Fallo({ mensaje, onReintentar }: { mensaje: string; onReintentar: () => void }) {
   return (
-    <div className="flex-1 flex items-center justify-center p-8">
+    <div className="min-h-[60vh] flex items-center justify-center p-8">
       <div className="text-center max-w-sm">
         <p className="text-lg font-medium text-stone-700">No se pudieron cargar las comandas</p>
         <p className="text-sm text-stone-500 mt-2 break-words">{mensaje}</p>
@@ -195,7 +200,7 @@ function Fallo({ mensaje, onReintentar }: { mensaje: string; onReintentar: () =>
 
 function SinTurno() {
   return (
-    <div className="flex-1 flex items-center justify-center p-8">
+    <div className="min-h-[60vh] flex items-center justify-center p-8">
       <div className="text-center max-w-sm">
         <p className="text-lg font-medium text-stone-700">No hay turno abierto</p>
         <p className="text-sm text-stone-500 mt-2">
