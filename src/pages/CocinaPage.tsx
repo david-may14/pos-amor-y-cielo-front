@@ -60,20 +60,40 @@ export default function CocinaPage() {
     }
   }, [])
 
+  /** Una consulta al abrir la pantalla, para saber si hay turno o no. */
+  useEffect(() => { refrescar() }, [refrescar])
+
+  /**
+   * El sondeo solo existe mientras hay turno abierto.
+   *
+   * Con la caja cerrada no hay nada que pueda cambiar, y seguir preguntando
+   * cada 6s serían miles de peticiones nocturnas que solo sirven para que
+   * Railway cobre por tenerlas atendidas. Al cerrarse el turno, la última
+   * respuesta apaga este intervalo sola.
+   *
+   * Lo que despierta la pantalla al abrir caja es el gesto de deslizar o volver
+   * a la app: acciones de una persona que está ahí mirando, no un bucle.
+   */
   useEffect(() => {
-    refrescar()
+    if (!estado.turnoAbierto) return
+
     const id = setInterval(() => {
       // Con la tablet bloqueada o en otra pestaña no hay nadie mirando; seguir
       // sondeando solo gastaría batería y datos.
       if (document.visibilityState === 'visible') refrescar()
     }, REFRESCO_MS)
+    return () => clearInterval(id)
+  }, [estado.turnoAbierto, refrescar])
 
+  /**
+   * Volver a la app siempre relee, haya turno o no. Es una sola petición
+   * disparada por alguien que acaba de mirar la pantalla — es justo el momento
+   * en que hay que enterarse de que ya abrieron caja.
+   */
+  useEffect(() => {
     const alVolver = () => { if (document.visibilityState === 'visible') refrescar() }
     document.addEventListener('visibilitychange', alVolver)
-    return () => {
-      clearInterval(id)
-      document.removeEventListener('visibilitychange', alVolver)
-    }
+    return () => document.removeEventListener('visibilitychange', alVolver)
   }, [refrescar])
 
   const conBloqueo = async (id: number, accion: () => Promise<unknown>) => {
@@ -123,7 +143,7 @@ export default function CocinaPage() {
         {fallo ? (
         <Fallo mensaje={fallo} onReintentar={refrescar} />
       ) : !estado.turnoAbierto ? (
-        <SinTurno />
+        <SinTurno onActualizar={refrescar} />
       ) : (
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
           <Columna titulo="Por preparar" vacio="Nada pendiente" comandas={porHacer}>
@@ -198,14 +218,23 @@ function Fallo({ mensaje, onReintentar }: { mensaje: string; onReintentar: () =>
   )
 }
 
-function SinTurno() {
+/**
+ * Con la caja cerrada esta pantalla deja de consultar al servidor, así que
+ * necesita decir cómo se despierta: si no, al abrir turno por la mañana parece
+ * que la tablet se quedó colgada.
+ */
+function SinTurno({ onActualizar }: { onActualizar: () => void }) {
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-8">
       <div className="text-center max-w-sm">
         <p className="text-lg font-medium text-stone-700">No hay turno abierto</p>
         <p className="text-sm text-stone-500 mt-2">
-          Las comandas aparecen aquí cuando alguien abre la caja.
+          Las comandas aparecen aquí cuando alguien abre la caja. Desliza hacia
+          abajo o toca el botón para volver a comprobarlo.
         </p>
+        <button onClick={onActualizar} className="btn-primary mt-5 px-6 py-2">
+          Comprobar ahora
+        </button>
       </div>
     </div>
   )
