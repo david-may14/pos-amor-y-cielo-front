@@ -27,6 +27,8 @@ export default function CocinaPage() {
   const [estado, setEstado] = useState<EstadoCocina>(VACIO)
   const [cargando, setCargando] = useState(true)
   const [sinConexion, setSinConexion] = useState(false)
+  /** Fallo del servidor, no de la red. Se distingue porque se arreglan distinto. */
+  const [fallo, setFallo] = useState('')
   const [aRevertir, setARevertir] = useState<ComandaCocina | null>(null)
   /** Ids con una acción en vuelo, para no dispararla dos veces de un toque doble. */
   const [ocupados, setOcupados] = useState<number[]>([])
@@ -40,11 +42,18 @@ export default function CocinaPage() {
       if (!montado.current) return
       setEstado(datos)
       setSinConexion(false)
+      setFallo('')
     } catch (e) {
       if (!montado.current) return
       // Sin red se deja en pantalla lo último que se supo: en media barra es
       // más útil una lista de hace un minuto que una pantalla en blanco.
       if (esErrorDeRed(e)) setSinConexion(true)
+      else {
+        // Un error del servidor no puede quedar mudo: sin esto, un backend sin
+        // la ruta desplegada se vería igual que una barra sin turno abierto, y
+        // se perdería media mañana buscando el turno que sí estaba abierto.
+        setFallo(e instanceof Error ? e.message : 'Error del servidor')
+      }
     } finally {
       if (montado.current) setCargando(false)
     }
@@ -107,7 +116,9 @@ export default function CocinaPage() {
         </Link>
       </header>
 
-      {!estado.turnoAbierto ? (
+      {fallo ? (
+        <Fallo mensaje={fallo} onReintentar={refrescar} />
+      ) : !estado.turnoAbierto ? (
         <SinTurno />
       ) : (
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 overflow-y-auto">
@@ -164,6 +175,20 @@ export default function CocinaPage() {
           onHecho={async () => { setARevertir(null); await refrescar() }}
         />
       )}
+    </div>
+  )
+}
+
+function Fallo({ mensaje, onReintentar }: { mensaje: string; onReintentar: () => void }) {
+  return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="text-center max-w-sm">
+        <p className="text-lg font-medium text-stone-700">No se pudieron cargar las comandas</p>
+        <p className="text-sm text-stone-500 mt-2 break-words">{mensaje}</p>
+        <button onClick={onReintentar} className="btn-primary mt-5 px-6 py-2">
+          Reintentar
+        </button>
+      </div>
     </div>
   )
 }
