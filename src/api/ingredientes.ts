@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api, descargarArchivo, subirArchivo } from './client'
 import type { Ingrediente, IngredienteRequest, AlertaStockDTO, SubrecetaDTO, SubrecetaRequest, IngredientePrecioDTO, AgregarPrecioRequest, IngPreviewResult, IngImportResult } from '../types/api'
 
 export const listarIngredientes = () => api.get<Ingrediente[]>('/api/ingredientes')
@@ -34,40 +34,11 @@ export const agregarPrecio = (id: number, data: AgregarPrecioRequest) =>
 export const desactivarPrecio = (ingredienteId: number, precioId: number) =>
   api.patch<void>(`/api/ingredientes/${ingredienteId}/precios/${precioId}/desactivar`, {})
 
-const BASE_URL = 'http://localhost:8080'
-const authHeaders = (): Record<string, string> => {
-  const token = localStorage.getItem('pos_token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
+export const exportarIngredientes = (): Promise<void> =>
+  descargarArchivo('/api/ingredientes/export', 'ingredientes.csv')
 
-export const exportarIngredientes = (): Promise<void> => {
-  const token = localStorage.getItem('pos_token')
-  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-  return fetch(`${BASE_URL}/api/ingredientes/export`, { headers })
-    .then(async (r) => {
-      if (!r.ok) throw new Error(await r.text())
-      const blob = await r.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'ingredientes.csv'
-      a.click()
-      URL.revokeObjectURL(url)
-    })
-}
+export const previewImportIngredientes = (file: File): Promise<IngPreviewResult> =>
+  subirArchivo<IngPreviewResult>('/api/ingredientes/import/preview', file)
 
-export const previewImportIngredientes = (file: File): Promise<IngPreviewResult> => {
-  const form = new FormData()
-  form.append('file', file)
-  return fetch(`${BASE_URL}/api/ingredientes/import/preview`, {
-    method: 'POST', headers: authHeaders(), body: form,
-  }).then(async (r) => { if (!r.ok) throw new Error(await r.text()); return r.json() })
-}
-
-export const confirmarImportIngredientes = (file: File): Promise<IngImportResult> => {
-  const form = new FormData()
-  form.append('file', file)
-  return fetch(`${BASE_URL}/api/ingredientes/import/confirmar`, {
-    method: 'POST', headers: authHeaders(), body: form,
-  }).then(async (r) => { if (!r.ok) throw new Error(await r.text()); return r.json() })
-}
+export const confirmarImportIngredientes = (file: File): Promise<IngImportResult> =>
+  subirArchivo<IngImportResult>('/api/ingredientes/import/confirmar', file)

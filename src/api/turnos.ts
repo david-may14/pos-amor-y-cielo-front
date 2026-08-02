@@ -3,6 +3,11 @@ import type { TurnoDTO } from '../types/api'
 
 export const obtenerTurnoActivo = () => api.get<TurnoDTO>('/api/turnos/activo')
 
+/** Para la caja (POSPage) y el aviso de cierre: cachea el turno activo para no
+ * bloquear la venta si se pierde la conexión justo al consultar el estado. */
+export const obtenerTurnoActivoOffline = () =>
+  api.getCached<TurnoDTO | null>('turnoActivo', '/api/turnos/activo')
+
 export const abrirTurno = (fondoInicial: number) =>
   api.post<TurnoDTO>('/api/turnos/abrir', { fondoInicial })
 

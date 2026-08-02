@@ -3,6 +3,9 @@ import type { Categoria, CategoriaRequest } from '../types/api'
 
 export const listarCategorias = () => api.get<Categoria[]>('/api/categorias')
 
+export const listarCategoriasOffline = () =>
+  api.getCached<Categoria[]>('categorias', '/api/categorias')
+
 export const crearCategoria = (data: CategoriaRequest) =>
   api.post<Categoria>('/api/categorias', data)
 

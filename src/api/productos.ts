@@ -1,10 +1,14 @@
-import { api } from './client'
+import { api, descargarArchivo, subirArchivo } from './client'
 import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, ModificadorGrupo, PlantillaDTO, ImportPreviewResult, ImportResult, CosteoDTO } from '../types/api'
 
 export const listarCosteo = () => api.get<CosteoDTO[]>('/api/productos/costeo')
 export const detalleCosteo = (id: number) => api.get<CosteoDTO>(`/api/productos/${id}/costeo`)
 
 export const listarProductos = () => api.get<ProductoDTO[]>('/api/productos')
+
+/** Para la caja (POSPage): cachea el catálogo para poder vender sin conexión. */
+export const listarProductosOffline = () =>
+  api.getCached<ProductoDTO[]>('productos', '/api/productos')
 
 export const crearProducto = (data: ProductoRequest) =>
   api.post<ProductoDTO>('/api/productos', data)
@@ -23,6 +27,10 @@ export const reemplazarReceta = (id: number, lineas: RecetaLineaRequest[]) =>
 
 export const listarModificadoresProducto = (id: number) =>
   api.get<ModificadorGrupo[]>(`/api/productos/${id}/modificadores`)
+
+/** Cachea por producto: solo estará disponible offline si ya se consultó una vez con conexión. */
+export const listarModificadoresProductoOffline = (id: number) =>
+  api.getCached<ModificadorGrupo[]>(`modificadores:${id}`, `/api/productos/${id}/modificadores`)
 
 export const asignarModificador = (productoId: number, grupoId: number) =>
   api.post<null>(`/api/productos/${productoId}/modificadores/${grupoId}`, {})
@@ -45,48 +53,14 @@ export const listarPlantillasProducto = (id: number) =>
 export const asignarPlantillasProducto = (id: number, plantillaIds: number[]) =>
   api.put<PlantillaDTO[]>(`/api/productos/${id}/plantillas`, plantillaIds)
 
-export const exportarProductos = async (): Promise<void> => {
-  const BASE_URL = 'http://localhost:8080'
-  const token = localStorage.getItem('pos_token')
-  const res = await fetch(`${BASE_URL}/api/productos/export`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-  if (!res.ok) throw new Error('Error al exportar')
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `productos-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
+export const exportarProductos = (): Promise<void> =>
+  descargarArchivo(
+    '/api/productos/export',
+    `productos-${new Date().toISOString().slice(0, 10)}.csv`,
+  )
 
-export const previewImport = (file: File): Promise<ImportPreviewResult> => {
-  const form = new FormData()
-  form.append('file', file)
-  const BASE_URL = 'http://localhost:8080'
-  const token = localStorage.getItem('pos_token')
-  return fetch(`${BASE_URL}/api/productos/import/preview`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form,
-  }).then(async (r) => {
-    if (!r.ok) throw new Error(await r.text())
-    return r.json()
-  })
-}
+export const previewImport = (file: File): Promise<ImportPreviewResult> =>
+  subirArchivo<ImportPreviewResult>('/api/productos/import/preview', file)
 
-export const confirmarImport = (file: File): Promise<ImportResult> => {
-  const form = new FormData()
-  form.append('file', file)
-  const BASE_URL = 'http://localhost:8080'
-  const token = localStorage.getItem('pos_token')
-  return fetch(`${BASE_URL}/api/productos/import/confirmar`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form,
-  }).then(async (r) => {
-    if (!r.ok) throw new Error(await r.text())
-    return r.json()
-  })
-}
+export const confirmarImport = (file: File): Promise<ImportResult> =>
+  subirArchivo<ImportResult>('/api/productos/import/confirmar', file)

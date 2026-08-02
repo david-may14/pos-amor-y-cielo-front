@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
-import { obtenerTurnoActivo, abrirTurno, cerrarTurno, listarTurnos, registrarMovimiento } from '../api/turnos'
-import type { TurnoDTO } from '../types/api'
+import { abrirTurno, cerrarTurno, listarTurnos, registrarMovimiento } from '../api/turnos'
+import { cerrarMes, listarCierresMensuales, previsualizarCierreMensual } from '../api/cierresMensuales'
+import type { TurnoDTO, CierreMensualDTO } from '../types/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useTurno } from '../contexts/TurnoContext'
+import { useCierreMensualPendiente } from '../hooks/useCierreMensual'
 import Spinner from '../components/Spinner'
+
+const MESES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+]
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
@@ -17,9 +25,8 @@ const hoy = () => new Date().toISOString().split('T')[0]
 
 export default function CajaPage() {
   const { isAdmin } = useAuth()
+  const { turno: turnoActivo, loading: loadingActivo, actualizarTurno } = useTurno()
 
-  const [turnoActivo, setTurnoActivo] = useState<TurnoDTO | null>(null)
-  const [loadingActivo, setLoadingActivo] = useState(true)
   const [error, setError] = useState('')
 
   // Apertura
@@ -43,18 +50,6 @@ export default function CajaPage() {
   const [historial, setHistorial] = useState<TurnoDTO[]>([])
   const [loadingHist, setLoadingHist] = useState(false)
 
-  const cargarActivo = useCallback(async () => {
-    setLoadingActivo(true)
-    try {
-      const t = await obtenerTurnoActivo()
-      setTurnoActivo(t)
-    } catch {
-      setTurnoActivo(null)
-    } finally {
-      setLoadingActivo(false)
-    }
-  }, [])
-
   const cargarHistorial = useCallback(async () => {
     if (!isAdmin) return
     setLoadingHist(true)
@@ -67,8 +62,61 @@ export default function CajaPage() {
     }
   }, [fecha, isAdmin])
 
-  useEffect(() => { cargarActivo() }, [cargarActivo])
   useEffect(() => { cargarHistorial() }, [cargarHistorial])
+
+  // Cierre mensual (admin)
+  const cierreMensualPendiente = useCierreMensualPendiente(isAdmin)
+  const [cierreMensualPreview, setCierreMensualPreview] = useState<CierreMensualDTO | null>(null)
+  const [loadingPreviewMes, setLoadingPreviewMes] = useState(false)
+  const [notasCierreMes, setNotasCierreMes] = useState('')
+  const [cerrandoMes, setCerrandoMes] = useState(false)
+  const [errorCierreMes, setErrorCierreMes] = useState('')
+  const [cierreMesConfirmado, setCierreMesConfirmado] = useState(false)
+  const [cierresMensuales, setCierresMensuales] = useState<CierreMensualDTO[]>([])
+  const [loadingCierresMensuales, setLoadingCierresMensuales] = useState(false)
+
+  const cargarCierresMensuales = useCallback(async () => {
+    if (!isAdmin) return
+    setLoadingCierresMensuales(true)
+    try {
+      setCierresMensuales(await listarCierresMensuales())
+    } catch {
+      setCierresMensuales([])
+    } finally {
+      setLoadingCierresMensuales(false)
+    }
+  }, [isAdmin])
+
+  useEffect(() => { cargarCierresMensuales() }, [cargarCierresMensuales])
+
+  const handlePrevisualizarCierreMes = async (anio: number, mes: number) => {
+    setLoadingPreviewMes(true)
+    setErrorCierreMes('')
+    try {
+      setCierreMensualPreview(await previsualizarCierreMensual(anio, mes))
+    } catch (e: unknown) {
+      setErrorCierreMes(e instanceof Error ? e.message : 'Error al calcular el cierre del mes')
+    } finally {
+      setLoadingPreviewMes(false)
+    }
+  }
+
+  const handleConfirmarCierreMes = async () => {
+    if (!cierreMensualPreview) return
+    setCerrandoMes(true)
+    setErrorCierreMes('')
+    try {
+      const cerrado = await cerrarMes(cierreMensualPreview.anio, cierreMensualPreview.mes, notasCierreMes || undefined)
+      setCierresMensuales((prev) => [cerrado, ...prev])
+      setCierreMensualPreview(null)
+      setNotasCierreMes('')
+      setCierreMesConfirmado(true)
+    } catch (e: unknown) {
+      setErrorCierreMes(e instanceof Error ? e.message : 'Error al cerrar el mes')
+    } finally {
+      setCerrandoMes(false)
+    }
+  }
 
   const handleAbrir = async () => {
     const fondo = parseFloat(fondoInicial) || 0
@@ -76,7 +124,7 @@ export default function CajaPage() {
     setError('')
     try {
       const t = await abrirTurno(fondo)
-      setTurnoActivo(t)
+      actualizarTurno(t)
       setFondoInicial('')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al abrir turno')
@@ -92,7 +140,7 @@ export default function CajaPage() {
     setError('')
     try {
       const t = await cerrarTurno(conteo, notasCierre || undefined)
-      setTurnoActivo(null)
+      actualizarTurno(null)
       setMostraCierre(false)
       setConteoEfectivo('')
       setNotasCierre('')
@@ -114,7 +162,7 @@ export default function CajaPage() {
     setError('')
     try {
       const t = await registrarMovimiento(tipoMovimiento, monto, motivoMovimiento.trim())
-      setTurnoActivo(t)
+      actualizarTurno(t)
       setTipoMovimiento(null)
       setMontoMovimiento('')
       setMotivoMovimiento('')
@@ -211,6 +259,25 @@ export default function CajaPage() {
               <div className="text-center">
                 <p className="text-xs text-stone-400 mb-1">Efectivo esperado</p>
                 <p className="font-semibold text-stone-700">{fmt(efectivoEsperado)}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-stone-100 pt-4 mt-4">
+              <div className="text-center">
+                <p className="text-xs text-stone-400 mb-1">Ventas efectivo</p>
+                <p className="font-semibold text-stone-700">{fmt(turnoActivo.ventasEfectivo ?? 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-stone-400 mb-1">Ventas tarjeta</p>
+                <p className="font-semibold text-stone-700">{fmt(turnoActivo.ventasTarjeta ?? 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-stone-400 mb-1">Propina efectivo</p>
+                <p className="font-semibold text-stone-700">{fmt(turnoActivo.propinaEfectivo ?? 0)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-stone-400 mb-1">Propina tarjeta</p>
+                <p className="font-semibold text-stone-700">{fmt(turnoActivo.propinaTarjeta ?? 0)}</p>
               </div>
             </div>
 
@@ -344,6 +411,12 @@ export default function CajaPage() {
               <span>Ventas en efectivo</span>
               <span>+{fmt(turnoActivo.ventasEfectivo ?? 0)}</span>
             </div>
+            {(turnoActivo.propinaEfectivo ?? 0) > 0 && (
+              <div className="flex justify-between text-stone-500">
+                <span>Propina en efectivo</span>
+                <span>+{fmt(turnoActivo.propinaEfectivo ?? 0)}</span>
+              </div>
+            )}
             {(turnoActivo.movimientosNeto ?? 0) !== 0 && (
               <div className="flex justify-between text-stone-500">
                 <span>Movimientos de caja</span>
@@ -475,6 +548,21 @@ export default function CajaPage() {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-3 gap-2 text-xs mt-2 pt-2 border-t border-stone-50">
+                      <div>
+                        <p className="text-stone-400">Ventas tarjeta</p>
+                        <p className="font-medium text-stone-700">{t.ventasTarjeta != null ? fmt(t.ventasTarjeta) : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-stone-400">Propina efectivo</p>
+                        <p className="font-medium text-stone-700">{t.propinaEfectivo != null ? fmt(t.propinaEfectivo) : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-stone-400">Propina tarjeta</p>
+                        <p className="font-medium text-stone-700">{t.propinaTarjeta != null ? fmt(t.propinaTarjeta) : '—'}</p>
+                      </div>
+                    </div>
+
                     {neto !== 0 && (
                       <p className="text-xs text-stone-400 mt-2 pt-2 border-t border-stone-50">
                         Movimientos de caja: <span className={neto >= 0 ? 'text-blue-500' : 'text-red-400'}>{neto >= 0 ? '+' : ''}{fmt(neto)}</span>
@@ -507,6 +595,159 @@ export default function CajaPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Cierre mensual (admin) ── */}
+      {isAdmin && (
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold text-stone-700 mb-4">Cierre mensual</h2>
+
+          {errorCierreMes && (
+            <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">{errorCierreMes}</div>
+          )}
+
+          {cierreMensualPreview ? (
+            <div className="card px-6 py-6 space-y-5">
+              <h3 className="font-semibold text-stone-800">
+                Cerrar {MESES[cierreMensualPreview.mes - 1]} de {cierreMensualPreview.anio}
+              </h3>
+
+              <div className="bg-surface-muted rounded-xl px-4 py-4 space-y-2 text-sm">
+                <div className="flex justify-between text-stone-500">
+                  <span>Ventas efectivo</span>
+                  <span>{fmt(cierreMensualPreview.ventasEfectivo)}</span>
+                </div>
+                <div className="flex justify-between text-stone-500">
+                  <span>Ventas tarjeta</span>
+                  <span>{fmt(cierreMensualPreview.ventasTarjeta)}</span>
+                </div>
+                <div className="flex justify-between text-stone-500">
+                  <span>Propina efectivo</span>
+                  <span>{fmt(cierreMensualPreview.propinaEfectivo)}</span>
+                </div>
+                <div className="flex justify-between text-stone-500">
+                  <span>Propina tarjeta</span>
+                  <span>{fmt(cierreMensualPreview.propinaTarjeta)}</span>
+                </div>
+                <div className="flex justify-between text-stone-500">
+                  <span>Costo de ventas</span>
+                  <span>-{fmt(cierreMensualPreview.costoTotal)}</span>
+                </div>
+                <div className="flex justify-between text-stone-500">
+                  <span>Gastos fijos</span>
+                  <span>-{fmt(cierreMensualPreview.gastosFijos)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-stone-800 border-t border-stone-200 pt-2 mt-1">
+                  <span>Utilidad neta estimada</span>
+                  <span className={cierreMensualPreview.utilidadNeta >= 0 ? 'text-forest' : 'text-red-500'}>
+                    {fmt(cierreMensualPreview.utilidadNeta)}
+                  </span>
+                </div>
+                <p className="text-xs text-stone-400 pt-1">{cierreMensualPreview.ventasCount} ventas en el mes</p>
+              </div>
+
+              <div>
+                <label className="label">Notas (opcional)</label>
+                <input
+                  className="input"
+                  placeholder="Ej. Se ajustaron gastos fijos a mitad de mes"
+                  value={notasCierreMes}
+                  onChange={(e) => setNotasCierreMes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setCierreMensualPreview(null); setErrorCierreMes('') }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmarCierreMes}
+                  disabled={cerrandoMes}
+                  className="btn-primary flex-1 flex justify-center gap-2 bg-red-500 hover:bg-red-600 border-red-500"
+                >
+                  {cerrandoMes && <Spinner className="w-4 h-4 text-cream" />}
+                  {cerrandoMes ? 'Cerrando…' : 'Confirmar cierre del mes'}
+                </button>
+              </div>
+            </div>
+          ) : cierreMensualPendiente && !cierreMesConfirmado ? (
+            <div className="card px-5 py-4 bg-red-50 border-red-200 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-red-800">Falta cerrar el mes de {cierreMensualPendiente.nombreMes}</p>
+                <p className="text-xs text-red-600">Suma ventas, propinas, costos y gastos fijos del mes.</p>
+              </div>
+              <button
+                onClick={() => handlePrevisualizarCierreMes(cierreMensualPendiente.anio, cierreMensualPendiente.mes)}
+                disabled={loadingPreviewMes}
+                className="flex-shrink-0 text-xs font-medium text-red-900 bg-red-100 hover:bg-red-200 border border-red-300 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loadingPreviewMes ? 'Calculando…' : 'Revisar y cerrar'}
+              </button>
+            </div>
+          ) : (
+            <div className="card px-6 py-6 text-center text-stone-400 text-sm">
+              Ya está al día — no hay ningún mes pendiente de cerrar.
+            </div>
+          )}
+
+          {loadingCierresMensuales ? (
+            <div className="flex justify-center py-8"><Spinner className="w-6 h-6 text-forest" /></div>
+          ) : cierresMensuales.length > 0 && (
+            <div className="space-y-3 mt-4">
+              {cierresMensuales.map((c) => (
+                <div key={c.id} className="card px-5 py-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-medium text-stone-800">{MESES[c.mes - 1]} {c.anio}</p>
+                      <p className="text-xs text-stone-400">
+                        {c.usuarioNombre} · {c.cerradoEn && fmtFecha(c.cerradoEn)}
+                      </p>
+                    </div>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      c.utilidadNeta >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                    }`}>
+                      {fmt(c.utilidadNeta)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-stone-400">Ventas efectivo</p>
+                      <p className="font-medium text-stone-700">{fmt(c.ventasEfectivo)}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-400">Ventas tarjeta</p>
+                      <p className="font-medium text-stone-700">{fmt(c.ventasTarjeta)}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-400">Propina efectivo</p>
+                      <p className="font-medium text-stone-700">{fmt(c.propinaEfectivo)}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-400">Propina tarjeta</p>
+                      <p className="font-medium text-stone-700">{fmt(c.propinaTarjeta)}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-400">Costo de ventas</p>
+                      <p className="font-medium text-stone-700">{fmt(c.costoTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-400">Gastos fijos</p>
+                      <p className="font-medium text-stone-700">{fmt(c.gastosFijos)}</p>
+                    </div>
+                  </div>
+
+                  {c.notas && (
+                    <p className="text-xs text-stone-400 italic mt-2 border-t border-stone-50 pt-2">{c.notas}</p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

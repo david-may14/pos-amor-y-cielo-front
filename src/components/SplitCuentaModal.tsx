@@ -13,6 +13,8 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { crearVenta, anularVenta } from '../api/ventas'
+import { isPrinterAvailable } from '../services/printer/connection'
+import { abrirCajon } from '../services/printer/cajon'
 import type { VentaResponse, MetodoPago } from '../types/api'
 import Modal from './Modal'
 import Spinner from './Spinner'
@@ -386,6 +388,9 @@ export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
         propina > 0 ? propina : undefined,
         splitId,
       )
+      if (c.metodoPago === 'EFECTIVO' && isPrinterAvailable()) {
+        abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
+      }
       setPagadas(prev => ({ ...prev, [c.id]: venta }))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al procesar venta')
@@ -453,7 +458,7 @@ export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
       <div className="bg-white flex flex-col w-full h-full">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100 flex-shrink-0">
+        <div className="flex items-center justify-between flex-wrap gap-y-2 px-4 sm:px-5 py-3 border-b border-stone-100 flex-shrink-0">
           <div className="flex items-center gap-2">
             <button onClick={() => setPhase('choose')} className="p-1 text-stone-400 hover:text-stone-700">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -462,7 +467,7 @@ export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
             </button>
             <h2 className="text-base font-semibold text-stone-800">Dividir cuenta</h2>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {unassignedCount > 0
               ? <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">{unassignedCount} sin asignar</span>
               : <span className="text-xs text-green-600 font-semibold">✓ Todo asignado</span>
@@ -472,18 +477,18 @@ export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
               <button
                 onClick={removeCuenta}
                 disabled={cuentas.length <= 1}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-stone-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all text-lg font-bold leading-none"
+                className="w-9 h-9 rounded-md flex items-center justify-center text-stone-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all text-lg font-bold leading-none"
                 title="Quitar cuenta"
               >−</button>
               <span className="text-xs font-semibold text-stone-600 w-4 text-center">{cuentas.length}</span>
               <button
                 onClick={addCuenta}
                 disabled={cuentas.length >= allUnitIds.length}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-stone-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all text-lg font-bold leading-none"
+                className="w-9 h-9 rounded-md flex items-center justify-center text-stone-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all text-lg font-bold leading-none"
                 title="Agregar cuenta"
               >+</button>
             </div>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-stone-400 hover:text-stone-700 text-2xl leading-none rounded-lg hover:bg-stone-100">×</button>
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-stone-400 hover:text-stone-700 text-2xl leading-none rounded-lg hover:bg-stone-100">×</button>
           </div>
         </div>
 
@@ -493,10 +498,10 @@ export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
 
         {/* ── Main area: sin asignar (fixed left) + cuentas (horizontal scroll) ── */}
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
 
-            {/* Left: sin asignar — fixed column, no scroll horizontally */}
-            <div className="w-40 flex-shrink-0 flex flex-col border-r border-stone-100 bg-stone-50">
+            {/* Left: sin asignar — full-width strip on mobile (bounded height), fixed side column on sm+ */}
+            <div className="w-full sm:w-40 flex-shrink-0 flex flex-col border-b sm:border-b-0 sm:border-r border-stone-100 bg-stone-50 max-h-36 sm:max-h-none">
               <div className="px-3 pt-3 pb-1 flex-shrink-0">
                 <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Sin asignar</p>
                 <p className="text-[10px] text-stone-400 mt-0.5">Arrastra a una cuenta →</p>

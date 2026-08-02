@@ -1,6 +1,13 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useTurno } from '../contexts/TurnoContext'
+import { iniciarAutoSync, sincronizarPendientes, usePendientesCount } from '../db/offlineSales'
+import { iniciarPrecarga } from '../db/precargaCatalogo'
+import { iniciarAutoSyncTickets } from '../db/offlineTickets'
+import { useVersionApp } from '../hooks/useVersionApp'
+import { useEsHoraDeCierre } from '../hooks/useHoraCierre'
+import { useCierreMensualPendiente } from '../hooks/useCierreMensual'
 
 interface NavItem {
   to: string
@@ -152,13 +159,42 @@ const navItems: NavItem[] = [
 ]
 
 export default function Layout() {
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, logout, bloquear, hayPin } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const pendientes = usePendientesCount()
+  const [sincronizando, setSincronizando] = useState(false)
+  const version = useVersionApp()
+  const { turno } = useTurno()
+  const esHoraDeCierre = useEsHoraDeCierre()
+  const cierreMensualPendiente = useCierreMensualPendiente(isAdmin)
 
-  const handleLogout = () => {
-    logout()
+  useEffect(() => {
+    iniciarAutoSync()
+    iniciarAutoSyncTickets()
+    // Baja el catálogo completo apenas hay sesión, para poder vender offline
+    // aunque nunca se haya abierto Caja con internet.
+    iniciarPrecarga()
+  }, [])
+
+  const handleSincronizar = async () => {
+    setSincronizando(true)
+    try {
+      await sincronizarPendientes()
+    } finally {
+      setSincronizando(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    await logout()
     navigate('/login')
+  }
+
+  // Bloquear conserva el PIN: se vuelve a entrar sin internet.
+  const handleBloquear = () => {
+    bloquear()
+    navigate('/desbloquear')
   }
 
   const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin)
@@ -166,7 +202,7 @@ export default function Layout() {
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="flex items-center justify-center px-4 py-6 border-b border-white/10">
+      <div className="safe-top flex items-center justify-center px-4 py-6 border-b border-white/10">
         <img
           src="/logo-cream.svg"
           alt="Amor y Cielo"
@@ -200,7 +236,23 @@ export default function Layout() {
         <div className="px-3 py-2 mb-1">
           <p className="text-sm font-medium text-cream truncate">{user?.nombre}</p>
           <p className="text-xs text-white/40">{user?.rol}</p>
+          {version && (
+            <p className="text-[10px] text-white/25 mt-1 font-mono" title={version.commit ?? ''}>
+              v{version.version} · {version.build}
+            </p>
+          )}
         </div>
+        {hayPin && (
+          <button
+            onClick={handleBloquear}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+            </svg>
+            Bloquear
+          </button>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
@@ -217,14 +269,14 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-surface overflow-hidden">
 
-      {/* Sidebar desktop — siempre visible en md+ */}
-      <aside className="hidden md:flex w-56 flex-shrink-0 bg-forest-deep flex-col">
+      {/* Sidebar desktop — siempre visible en lg+ (md/tablet usa el menú hamburguesa para no robar ancho a las grillas de contenido) */}
+      <aside className="hidden lg:flex w-56 flex-shrink-0 bg-forest-deep flex-col">
         {sidebarContent}
       </aside>
 
-      {/* Sidebar mobile — overlay deslizable */}
+      {/* Sidebar mobile/tablet — overlay deslizable */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 flex md:hidden">
+        <div className="fixed inset-0 z-40 flex lg:hidden">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/50"
@@ -239,8 +291,8 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        {/* Header mobile con hamburguesa */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-forest-deep border-b border-white/10 flex-shrink-0">
+        {/* Header mobile/tablet con hamburguesa */}
+        <header className="safe-top lg:hidden flex items-center gap-3 px-4 py-3 bg-forest-deep border-b border-white/10 flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
             className="text-white/70 hover:text-white p-1"
@@ -257,7 +309,47 @@ export default function Layout() {
           />
         </header>
 
-        <main className="flex-1 overflow-hidden flex flex-col">
+        {turno && esHoraDeCierre && (
+          <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-red-50 border-b border-red-200 text-xs text-red-800">
+            <span>Ya son más de las 10:00 pm — recuerda cerrar el turno.</span>
+            <button
+              onClick={() => navigate('/caja')}
+              className="flex-shrink-0 font-medium text-red-900 bg-red-100 hover:bg-red-200 border border-red-300 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              Ir a Turno
+            </button>
+          </div>
+        )}
+
+        {cierreMensualPendiente && (
+          <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-red-50 border-b border-red-200 text-xs text-red-800">
+            <span>Falta cerrar el mes de {cierreMensualPendiente.nombreMes}.</span>
+            <button
+              onClick={() => navigate('/caja')}
+              className="flex-shrink-0 font-medium text-red-900 bg-red-100 hover:bg-red-200 border border-red-300 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              Ir a Turno
+            </button>
+          </div>
+        )}
+
+        {pendientes > 0 && (
+          <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
+            <span>
+              {pendientes} venta{pendientes !== 1 ? 's' : ''} pendiente{pendientes !== 1 ? 's' : ''} de sincronizar
+              — se guardaron sin conexión y aún no aparecen en reportes ni analytics.
+            </span>
+            <button
+              onClick={handleSincronizar}
+              disabled={sincronizando}
+              className="flex-shrink-0 font-medium text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {sincronizando ? 'Sincronizando…' : 'Reintentar ahora'}
+            </button>
+          </div>
+        )}
+
+        <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
           <Outlet />
         </main>
       </div>

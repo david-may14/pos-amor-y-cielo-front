@@ -355,20 +355,21 @@ export default function CosteoPage() {
             <tr className="bg-stone-50 text-left border-b border-stone-100">
               <th className="px-5 py-3 w-8"></th>
               {([
-                { col: 'nombre',    label: 'Producto',      right: false },
-                { col: 'categoria', label: 'Categoría',     right: false },
-                { col: 'costo',     label: 'Costo',         right: true  },
-                { col: 'precio',    label: 'Precio',        right: true  },
-                { col: 'foodcost',  label: 'Food cost %',   right: true  },
-                { col: 'margenabs', label: 'Margen $ neto', right: true  },
-                { col: 'margenpct', label: 'Margen % neto', right: true  },
-              ] as const).map(({ col, label, right }) => (
+                { col: 'nombre',    label: 'Producto',      right: false, hideMobile: false },
+                { col: 'categoria', label: 'Categoría',     right: false, hideMobile: true  },
+                { col: 'costo',     label: 'Costo',         right: true,  hideMobile: false },
+                { col: 'precio',    label: 'Precio',        right: true,  hideMobile: false },
+                { col: 'foodcost',  label: 'Food cost %',   right: true,  hideMobile: false },
+                { col: 'margenabs', label: 'Margen $ neto', right: true,  hideMobile: true  },
+                { col: 'margenpct', label: 'Margen % neto', right: true,  hideMobile: false },
+              ] as const).map(({ col, label, right, hideMobile }) => (
                 <th
                   key={col}
                   onClick={() => handleSort(col)}
                   className={`px-5 py-3 text-xs font-medium uppercase tracking-wide cursor-pointer select-none
                     ${sortCol === col ? 'text-forest' : 'text-stone-400 hover:text-stone-600'}
-                    ${right ? 'text-right' : ''}`}
+                    ${right ? 'text-right' : ''}
+                    ${hideMobile ? 'hidden sm:table-cell' : ''}`}
                 >
                   <span className="inline-flex items-center gap-1">
                     {label}
@@ -404,13 +405,13 @@ export default function CosteoPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-stone-500">{p.categoria || '—'}</td>
+                  <td className="hidden sm:table-cell px-5 py-3 text-stone-500">{p.categoria || '—'}</td>
                   <td className="px-5 py-3 text-right text-stone-600">{p.costoTotal > 0 ? fmt(p.costoTotal) : <span className="text-stone-300 italic text-xs">—</span>}</td>
                   <td className="px-5 py-3 text-right font-semibold text-forest">{fmt(p.precioVenta)}</td>
                   <td className="px-5 py-3 text-right">
                     {foodCostPct(p.precioVenta, costoBase(p)) != null ? <FoodCostBadge pct={foodCostPct(p.precioVenta, costoBase(p))!} /> : '—'}
                   </td>
-                  <td className="px-5 py-3 text-right text-stone-600">
+                  <td className="hidden sm:table-cell px-5 py-3 text-right text-stone-600">
                     {margenRealAbs(p.precioVenta, costoBase(p)) != null ? fmt(margenRealAbs(p.precioVenta, costoBase(p))!) : '—'}
                   </td>
                   <td className="px-5 py-3 text-right">

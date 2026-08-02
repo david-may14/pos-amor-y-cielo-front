@@ -1,12 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { listarProductos, listarModificadoresProducto } from '../api/productos'
-import { listarCategorias } from '../api/categorias'
+import { listarProductosOffline, listarModificadoresProductoOffline } from '../api/productos'
+import { listarCategoriasOffline } from '../api/categorias'
 import { crearVenta } from '../api/ventas'
-import { getDescuentoAplicable, listarDescuentos, listarDescuentosTicket } from '../api/descuentos'
-import { detalleTicket, crearTicket, actualizarTicket, cobrarTicket } from '../api/tickets'
+import { getDescuentoAplicableOffline, listarDescuentosOffline, listarDescuentosTicketOffline } from '../api/descuentos'
+import {
+  crearTicketLocal, actualizarTicketLocal, obtenerTicketLocal, marcarTicketCobrado,
+} from '../db/offlineTickets'
+import type { TicketLocal } from '../db/offlineDb'
 import { obtenerEquilibrio } from '../api/equilibrio'
+import { imprimirRecibo } from '../services/printer/recibo'
+import { isPrinterAvailable } from '../services/printer/connection'
+import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
+import { useTurno } from '../contexts/TurnoContext'
+import { esErrorDeRed } from '../api/client'
+import { encolarVenta } from '../db/offlineSales'
 import type {
   ProductoDTO, Categoria, VentaResponse, MetodoPago, ModificadorGrupo, DescuentoView,
   TicketResponse, TicketItemRequest, EquilibrioDTO,
@@ -72,10 +81,54 @@ const descuentoMontoItem = (item: CartItem): number => {
 const fmtDescuento = (d: DescuentoView | CartDiscount) =>
   d.tipo === 'PORCENTAJE' ? `${d.valor}%` : fmt(d.valor)
 
+/** Estado sintético usado solo del lado del cliente para ventas guardadas offline. */
+const ESTADO_PENDIENTE_SYNC = 'PENDIENTE_SYNC'
+
+/** Construye un VentaResponse "de mentira" a partir del carrito, para poder mostrar
+ * el recibo e imprimirlo aunque la venta real todavía no exista en el servidor. */
+function ventaPendienteAVentaResponse(args: {
+  clientId: string
+  ocurrioEn: string
+  metodoPago: MetodoPago
+  cart: CartItem[]
+  total: number
+  descuentoTicket: DescuentoView | null
+  descuentoTicketMonto: number
+  propina: number
+}): VentaResponse {
+  const { clientId, ocurrioEn, metodoPago, cart, total, descuentoTicket, descuentoTicketMonto, propina } = args
+  return {
+    id: 0,
+    total,
+    costoTotal: 0,
+    propina,
+    ivaMonto: 0,
+    comisionMonto: 0,
+    estado: ESTADO_PENDIENTE_SYNC,
+    metodoPago,
+    creadaEn: ocurrioEn,
+    items: cart.map((i) => ({
+      nombreProducto: i.nombre,
+      cantidad: i.cantidad,
+      precioUnitario: i.precioUnitario,
+      costoUnitario: 0,
+      notas: i.notas || null,
+      modificadores: i.mods.map((m) => ({ nombre: m.nombre, precioExtra: m.precioExtra })),
+      descuentoNombre: i.descuento?.nombre ?? null,
+      descuentoMonto: i.descuento ? descuentoMontoItem(i) : null,
+    })),
+    descuentoTicketNombre: descuentoTicket?.nombre ?? null,
+    descuentoTicketMonto: descuentoTicketMonto > 0 ? descuentoTicketMonto : null,
+    splitGrupo: null,
+    clientId,
+  }
+}
+
 export default function POSPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
+  const { turno, loading: turnoLoading } = useTurno()
   const [productos, setProductos] = useState<ProductoDTO[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
@@ -90,11 +143,14 @@ export default function POSPage() {
   const [ventaExitosa, setVentaExitosa] = useState<VentaResponse | null>(null)
   const [showSplit, setShowSplit] = useState(false)
   const [splitResults, setSplitResults] = useState<VentaResponse[] | null>(null)
+  const [imprimiendoId, setImprimiendoId] = useState<number | null>(null)
+  const [printError, setPrintError] = useState('')
+  const [abriendoCajon, setAbriendoCajon] = useState(false)
   const [expandedNotas, setExpandedNotas] = useState<Set<string>>(new Set())
   const [vistaMovil, setVistaMovil] = useState<'productos' | 'carrito'>('productos')
 
   // Ticket activo (modo edición)
-  const [ticketActivo, setTicketActivo] = useState<TicketResponse | null>(null)
+  const [ticketActivo, setTicketActivo] = useState<TicketLocal | null>(null)
   const [showGuardarTicket, setShowGuardarTicket] = useState(false)
   const [nombreTicketInput, setNombreTicketInput] = useState('')
   const [savingTicket, setSavingTicket] = useState(false)
@@ -116,15 +172,22 @@ export default function POSPage() {
     setLoading(true)
     try {
       const [prods, cats, dticket] = await Promise.all([
-        listarProductos(),
-        listarCategorias(),
-        listarDescuentosTicket().catch(() => [] as DescuentoView[]),
+        listarProductosOffline(),
+        listarCategoriasOffline(),
+        listarDescuentosTicketOffline().catch(() => [] as DescuentoView[]),
       ])
       setProductos(prods)
       setCategorias(cats.sort((a, b) => a.orden - b.orden))
       setDescuentosTicket(dticket)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error al cargar')
+      if (esErrorDeRed(e)) {
+        setError(
+          'Sin conexión y este dispositivo todavía no tiene el catálogo descargado. ' +
+          'Conéctate a internet una vez y se guardará solo para poder vender offline después.',
+        )
+      } else {
+        setError(e instanceof Error ? e.message : 'Error al cargar')
+      }
     } finally {
       setLoading(false)
     }
@@ -142,22 +205,25 @@ export default function POSPage() {
   useEffect(() => { cargar() }, [cargar])
   useEffect(() => { cargarEquilibrio() }, [cargarEquilibrio])
 
-  // Hidratar ticket desde el state de navegación
-  const hidratarTicket = useCallback(async (ticketId: number) => {
+  // Hidratar ticket desde el state de navegación. Sale del almacén local, así
+  // que abrir una comanda funciona igual sin conexión.
+  const hidratarTicket = useCallback(async (clientId: string) => {
     try {
-      const [t, descuentos] = await Promise.all([
-        detalleTicket(ticketId),
-        listarDescuentos().catch(() => [] as DescuentoView[]),
-      ])
+      const t = await obtenerTicketLocal(clientId)
+      if (!t) {
+        setError('No se encontró la comanda en este dispositivo')
+        return
+      }
+      const descuentos = await listarDescuentosOffline().catch(() => [] as DescuentoView[])
       const descById = new Map(descuentos.map(d => [d.id, d]))
       const items: CartItem[] = t.items.map((ti, idx) => ({
-        lineId: `tk-${t.id}-${ti.id}-${idx}`,
+        lineId: `tk-${t.clientId}-${idx}`,
         productoId: ti.productoId,
         nombre: ti.nombreProducto,
         precioUnitario: ti.precioUnitario,
         cantidad: ti.cantidad,
         notas: ti.notas ?? '',
-        mods: ti.modificadores.map(m => ({ opcionId: m.opcionId, nombre: m.nombre, precioExtra: m.precioExtra })),
+        mods: (ti.modificadores ?? []).map(m => ({ opcionId: m.opcionId, nombre: m.nombre, precioExtra: m.precioExtra })),
         descuento: ti.descuentoId
           ? (() => {
               const d = descById.get(ti.descuentoId!)
@@ -173,9 +239,9 @@ export default function POSPage() {
   }, [])
 
   useEffect(() => {
-    const ticketId = (location.state as { ticketId?: number } | null)?.ticketId
-    if (ticketId) {
-      hidratarTicket(ticketId)
+    const clientId = (location.state as { ticketClientId?: string } | null)?.ticketClientId
+    if (clientId) {
+      hidratarTicket(clientId)
       // limpiar el state para que un refresh no recargue
       navigate(location.pathname, { replace: true })
     }
@@ -201,12 +267,16 @@ export default function POSPage() {
     setSavingTicket(true)
     setError('')
     try {
-      const payload = { nombre: nombreTicketInput.trim() || null, items: cartToTicketItems() }
+      // Se guarda en el dispositivo y se sube en cuanto haya red: guardar una
+      // comanda nunca depende de la conexión.
+      const nombre = nombreTicketInput.trim() || null
+      const items = cartToTicketItems()
       if (ticketActivo) {
-        const t = await actualizarTicket(ticketActivo.id, payload)
-        setTicketActivo(t)
+        await actualizarTicketLocal(ticketActivo.clientId, nombre, items)
+        const t = await obtenerTicketLocal(ticketActivo.clientId)
+        if (t) setTicketActivo(t)
       } else {
-        await crearTicket(payload)
+        await crearTicketLocal(nombre, items)
         clearCart()
         setTicketActivo(null)
       }
@@ -249,11 +319,15 @@ export default function POSPage() {
   }
 
   const handleProductoClick = async (producto: ProductoDTO) => {
+    if (!turno) {
+      setError('Abre el turno en la pestaña "Turno" antes de vender.')
+      return
+    }
     setLoadingMods((prev) => new Set(prev).add(producto.id))
     try {
       const [grupos, descuentoAplicable] = await Promise.all([
-        listarModificadoresProducto(producto.id),
-        getDescuentoAplicable(producto.id).catch(() => null),
+        listarModificadoresProductoOffline(producto.id),
+        getDescuentoAplicableOffline(producto.id).catch(() => null),
       ])
       setModModal({ producto, grupos, seleccion: {}, descuentoAplicable, descuentoActivo: !!descuentoAplicable, cantidad: 1 })
       setModError('')
@@ -364,31 +438,57 @@ export default function POSPage() {
 
   const handleCobrar = async () => {
     if (cart.length === 0) return
+    if (!turno) {
+      setError('Abre el turno en la pestaña "Turno" antes de cobrar.')
+      return
+    }
     setSubmitting(true)
     setError('')
     try {
       let venta: VentaResponse
+      const items = cart.map((i) => ({
+        productoId: i.productoId,
+        cantidad: i.cantidad,
+        ...(i.notas ? { notas: i.notas } : {}),
+        ...(i.mods.length > 0 ? { modificadorOpcionIds: i.mods.map((m) => m.opcionId) } : {}),
+        ...(i.descuento ? { descuentoId: i.descuento.descuentoId } : {}),
+      }))
+      const descuentoTicketId = descuentoTicket?.id ?? null
+      const propinaFinal = propinaNum > 0 ? propinaNum : 0
+
+      // Cobrar una comanda es cobrar sus items: se registra la venta igual que
+      // una normal y la comanda se marca como cobrada en el dispositivo. Así el
+      // cobro tampoco depende de la conexión.
       if (ticketActivo) {
-        // Sincronizar items por si fueron modificados, luego cobrar
-        await actualizarTicket(ticketActivo.id, {
-          nombre: ticketActivo.nombre,
-          items: cartToTicketItems(),
-        })
-        venta = await cobrarTicket(ticketActivo.id, {
+        await actualizarTicketLocal(ticketActivo.clientId, ticketActivo.nombre, cartToTicketItems())
+      }
+
+      // Se genera aquí y no solo en la cola offline: es lo que permite enlazar
+      // la comanda con su venta al sincronizar, y de paso hace idempotente el
+      // reintento si la respuesta se pierde.
+      const ventaClientId = crypto.randomUUID()
+
+      try {
+        venta = await crearVenta(items, metodoPago, descuentoTicketId, propinaFinal || undefined, null, ventaClientId)
+        if (ticketActivo) await marcarTicketCobrado(ticketActivo.clientId, ventaClientId)
+      } catch (e) {
+        if (!esErrorDeRed(e)) throw e
+        const pendiente = await encolarVenta({ items, metodoPago, descuentoTicketId, propina: propinaFinal })
+        if (ticketActivo) await marcarTicketCobrado(ticketActivo.clientId, pendiente.clientId)
+        venta = ventaPendienteAVentaResponse({
+          clientId: pendiente.clientId,
+          ocurrioEn: pendiente.ocurrioEn,
           metodoPago,
-          descuentoTicketId: descuentoTicket?.id ?? null,
-          propina: propinaNum > 0 ? propinaNum : 0,
+          cart,
+          total,
+          descuentoTicket,
+          descuentoTicketMonto,
+          propina: propinaFinal,
         })
-        setTicketActivo(null)
-      } else {
-        const items = cart.map((i) => ({
-          productoId: i.productoId,
-          cantidad: i.cantidad,
-          ...(i.notas ? { notas: i.notas } : {}),
-          ...(i.mods.length > 0 ? { modificadorOpcionIds: i.mods.map((m) => m.opcionId) } : {}),
-          ...(i.descuento ? { descuentoId: i.descuento.descuentoId } : {}),
-        }))
-        venta = await crearVenta(items, metodoPago, descuentoTicket?.id ?? null, propinaNum > 0 ? propinaNum : undefined)
+      }
+      if (ticketActivo) setTicketActivo(null)
+      if (metodoPago === 'EFECTIVO' && isPrinterAvailable()) {
+        abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
       }
       setVentaExitosa(venta)
       clearCart()
@@ -397,6 +497,30 @@ export default function POSPage() {
       setError(e instanceof Error ? e.message : 'Error al procesar la venta')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleAbrirCajon = async () => {
+    setPrintError('')
+    setAbriendoCajon(true)
+    try {
+      await abrirCajon()
+    } catch (e: unknown) {
+      setPrintError(e instanceof Error ? e.message : 'No se pudo abrir el cajón')
+    } finally {
+      setAbriendoCajon(false)
+    }
+  }
+
+  const handleImprimir = async (venta: VentaResponse) => {
+    setPrintError('')
+    setImprimiendoId(venta.id)
+    try {
+      await imprimirRecibo(venta)
+    } catch (e: unknown) {
+      setPrintError(e instanceof Error ? e.message : 'No se pudo imprimir el recibo')
+    } finally {
+      setImprimiendoId(null)
     }
   }
 
@@ -431,21 +555,63 @@ export default function POSPage() {
     <div className="flex-1 flex overflow-hidden">
       {/* ── Productos ── */}
       <div className={`flex-1 flex flex-col overflow-hidden ${vistaMovil === 'carrito' ? 'hidden lg:flex' : 'flex'}`}>
-        <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 flex gap-1 overflow-x-auto">
-          {['Todos', ...categorias.map((c) => c.nombre)].map((cat) => (
+        <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 flex items-center gap-1">
+          {/*
+            overflow-y-hidden y touch-pan-x son deliberados: en CSS, poner
+            overflow-x en auto convierte también el eje Y en scrollable, y con
+            2-3 px de desbordamiento vertical por redondeo (depende del
+            device-pixel-ratio, por eso falla en unas pantallas y no en otras)
+            el navegador retiene el primer toque para decidir si es scroll.
+            Resultado: hay que tocar dos veces. Fijando el eje Y no hay nada
+            que decidir.
+          */}
+          <div className="flex gap-1 overflow-x-auto overflow-y-hidden touch-pan-x">
+            {['Todos', ...categorias.map((c) => c.nombre)].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategoria(cat)}
+                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  selectedCategoria === cat
+                    ? 'border-forest text-forest'
+                    : 'border-transparent text-stone-400 hover:text-stone-700'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          {!ticketActivo && (
             <button
-              key={cat}
-              onClick={() => setSelectedCategoria(cat)}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                selectedCategoria === cat
-                  ? 'border-forest text-forest'
-                  : 'border-transparent text-stone-400 hover:text-stone-700'
-              }`}
+              onClick={() => navigate('/tickets')}
+              title="Ver comandas abiertas"
+              className={`lg:hidden flex-shrink-0 text-stone-400 hover:text-forest hover:bg-surface-muted rounded-lg p-2 transition-colors ${isPrinterAvailable() ? '' : 'ml-auto'}`}
             >
-              {cat}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+              </svg>
             </button>
-          ))}
+          )}
+          {isPrinterAvailable() && (
+            <button
+              onClick={handleAbrirCajon}
+              disabled={abriendoCajon}
+              title="Abrir cajón"
+              className="flex-shrink-0 ml-auto text-stone-400 hover:text-forest hover:bg-surface-muted rounded-lg p-2 transition-colors disabled:opacity-50"
+            >
+              {abriendoCajon ? (
+                <Spinner className="w-4 h-4" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 8.25v10.5a1.5 1.5 0 0 0 1.5 1.5h16.5a1.5 1.5 0 0 0 1.5-1.5V8.25M2.25 8.25V6a1.5 1.5 0 0 1 1.5-1.5h16.5A1.5 1.5 0 0 1 21.75 6v2.25M10.5 12.75h3" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
+
+        {printError && !ventaExitosa && !splitResults && (
+          <p className="mx-4 mt-3 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{printError}</p>
+        )}
 
         {isAdmin && equilibrio && (
           <div className={`flex-shrink-0 mx-4 mt-2 rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm ${
@@ -476,6 +642,21 @@ export default function POSPage() {
           </div>
         )}
 
+        {!turnoLoading && !turno && (
+          <div className="flex-shrink-0 mx-4 mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-800">No hay turno abierto</p>
+              <p className="text-xs text-amber-600">Abre el turno para poder registrar ventas.</p>
+            </div>
+            <button
+              onClick={() => navigate('/caja')}
+              className="flex-shrink-0 text-xs font-medium text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3 py-2 rounded-lg transition-colors"
+            >
+              Abrir turno
+            </button>
+          </div>
+        )}
+
         <div className="flex-shrink-0 px-4 pt-3 pb-2">
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -499,7 +680,15 @@ export default function POSPage() {
 
         <div className="flex-1 overflow-y-auto p-4 pt-2">
           {error && (
-            <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">{error}</div>
+            <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-4 flex items-start justify-between gap-3">
+              <span>{error}</span>
+              <button
+                onClick={() => { setError(''); cargar() }}
+                className="flex-shrink-0 font-medium text-red-800 bg-red-100 hover:bg-red-200 border border-red-300 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                Reintentar
+              </button>
+            </div>
           )}
           {filteredProductos.length === 0 ? (
             <div className="flex items-center justify-center h-40 text-stone-400 text-sm">
@@ -514,10 +703,10 @@ export default function POSPage() {
                   <button
                     key={p.id}
                     onClick={() => handleProductoClick(p)}
-                    disabled={isLoadingMod}
+                    disabled={isLoadingMod || !turno}
                     className={`card text-left p-4 hover:shadow-md hover:border-forest/30 transition-all active:scale-95 ${
                       cantEnCart > 0 ? 'ring-2 ring-forest/40 border-forest/20' : ''
-                    } ${isLoadingMod ? 'opacity-60 cursor-wait' : ''}`}
+                    } ${isLoadingMod ? 'opacity-60 cursor-wait' : ''} ${!turno ? 'opacity-50 cursor-not-allowed active:scale-100' : ''}`}
                   >
                     {isLoadingMod ? (
                       <Spinner className="w-4 h-4 text-forest mb-2" />
@@ -599,7 +788,7 @@ export default function POSPage() {
         {ticketActivo && (
           <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 text-xs">
             <p className="font-semibold text-amber-800 truncate">
-              Ticket #{ticketActivo.id} - {fmtHora(ticketActivo.creadoEn)}
+              {ticketActivo.servidorId ? `Ticket #${ticketActivo.servidorId}` : 'Comanda'} - {fmtHora(ticketActivo.creadoEn)}
             </p>
             {ticketActivo.nombre && (
               <p className="text-amber-600 truncate mt-0.5">{ticketActivo.nombre}</p>
@@ -655,14 +844,14 @@ export default function POSPage() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={() => updateCantidad(item.lineId, -1)}
-                        className="w-7 h-7 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-100 flex items-center justify-center text-base leading-none"
+                        className="w-9 h-9 rounded-lg bg-white border border-stone-200 text-stone-600 hover:bg-stone-100 flex items-center justify-center text-base leading-none"
                       >
                         −
                       </button>
                       <span className="text-sm font-semibold w-4 text-center">{item.cantidad}</span>
                       <button
                         onClick={() => updateCantidad(item.lineId, 1)}
-                        className="w-7 h-7 rounded-lg bg-forest text-cream hover:bg-forest-dark flex items-center justify-center text-base leading-none"
+                        className="w-9 h-9 rounded-lg bg-forest text-cream hover:bg-forest-dark flex items-center justify-center text-base leading-none"
                       >
                         +
                       </button>
@@ -896,7 +1085,8 @@ export default function POSPage() {
             </button>
             <button
               onClick={handleCobrar}
-              disabled={cart.length === 0 || submitting}
+              disabled={cart.length === 0 || submitting || !turno}
+              title={!turno ? 'Abre el turno antes de cobrar' : undefined}
               className="btn-primary flex-1 py-3 text-base flex items-center justify-center gap-2"
             >
               {submitting && <Spinner className="w-4 h-4 text-cream" />}
@@ -999,14 +1189,14 @@ export default function POSPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setModModal((p) => p ? { ...p, cantidad: Math.max(1, p.cantidad - 1) } : p)}
-                  className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center text-lg leading-none"
+                  className="w-10 h-10 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center text-lg leading-none"
                 >
                   −
                 </button>
                 <span className="text-lg font-semibold text-stone-800 w-6 text-center">{modModal.cantidad}</span>
                 <button
                   onClick={() => setModModal((p) => p ? { ...p, cantidad: p.cantidad + 1 } : p)}
-                  className="w-8 h-8 rounded-lg bg-forest text-cream hover:bg-forest-dark flex items-center justify-center text-lg leading-none"
+                  className="w-10 h-10 rounded-lg bg-forest text-cream hover:bg-forest-dark flex items-center justify-center text-lg leading-none"
                 >
                   +
                 </button>
@@ -1074,9 +1264,22 @@ export default function POSPage() {
                     <span>Total</span>
                     <span>{fmt(v.total + (v.propina ?? 0))}</span>
                   </div>
+                  {isPrinterAvailable() && (
+                    <button
+                      onClick={() => handleImprimir(v)}
+                      disabled={imprimiendoId === v.id}
+                      className="btn-secondary w-full py-1.5 text-xs mt-2 flex items-center justify-center gap-1.5"
+                    >
+                      {imprimiendoId === v.id && <Spinner className="w-3.5 h-3.5" />}
+                      {imprimiendoId === v.id ? 'Imprimiendo…' : 'Imprimir recibo'}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
+            {printError && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{printError}</p>
+            )}
             <button onClick={() => setSplitResults(null)} className="btn-primary w-full py-2.5">
               Nueva venta
             </button>
@@ -1088,11 +1291,17 @@ export default function POSPage() {
       {ventaExitosa && (
         <Modal title="Venta registrada" onClose={() => setVentaExitosa(null)} size="sm">
           <div className="space-y-4">
-            <div className="flex items-center gap-3 bg-green-50 rounded-xl p-4">
-              <span className="text-2xl">✓</span>
+            <div className={`flex items-center gap-3 rounded-xl p-4 ${
+              ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'bg-amber-50' : 'bg-green-50'
+            }`}>
+              <span className="text-2xl">{ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? '⏳' : '✓'}</span>
               <div>
-                <p className="font-semibold text-green-800">Venta #{ventaExitosa.id}</p>
-                <p className="text-sm text-green-600">{ventaExitosa.metodoPago}</p>
+                <p className={`font-semibold ${ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'text-amber-800' : 'text-green-800'}`}>
+                  {ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'Venta guardada (sin conexión)' : `Venta #${ventaExitosa.id}`}
+                </p>
+                <p className={`text-sm ${ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'text-amber-600' : 'text-green-600'}`}>
+                  {ventaExitosa.estado === ESTADO_PENDIENTE_SYNC ? 'Se sincronizará sola al recuperar internet' : ventaExitosa.metodoPago}
+                </p>
               </div>
             </div>
 
@@ -1160,9 +1369,25 @@ export default function POSPage() {
               </div>
             )}
 
-            <button onClick={() => setVentaExitosa(null)} className="btn-primary w-full py-2.5">
-              Nueva venta
-            </button>
+            {printError && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{printError}</p>
+            )}
+
+            <div className="flex gap-2">
+              {isPrinterAvailable() && (
+                <button
+                  onClick={() => handleImprimir(ventaExitosa)}
+                  disabled={imprimiendoId === ventaExitosa.id}
+                  className="btn-secondary flex-1 py-2.5 flex items-center justify-center gap-2"
+                >
+                  {imprimiendoId === ventaExitosa.id && <Spinner className="w-4 h-4" />}
+                  {imprimiendoId === ventaExitosa.id ? 'Imprimiendo…' : 'Imprimir recibo'}
+                </button>
+              )}
+              <button onClick={() => setVentaExitosa(null)} className="btn-primary flex-1 py-2.5">
+                Nueva venta
+              </button>
+            </div>
           </div>
         </Modal>
       )}

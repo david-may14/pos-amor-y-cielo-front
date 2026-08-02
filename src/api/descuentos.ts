@@ -4,6 +4,10 @@ import type { DescuentoView, DescuentoRequest } from '../types/api'
 export const listarDescuentos = () =>
   api.get<DescuentoView[]>('/api/descuentos')
 
+/** Para la caja: hace falta al abrir una comanda, que debe funcionar sin conexión. */
+export const listarDescuentosOffline = () =>
+  api.getCached<DescuentoView[]>('descuentos', '/api/descuentos')
+
 export const crearDescuento = (data: DescuentoRequest) =>
   api.post<DescuentoView>('/api/descuentos', data)
 
@@ -28,5 +32,14 @@ export const quitarProducto = (id: number, prodId: number) =>
 export const getDescuentoAplicable = (productoId: number) =>
   api.get<DescuentoView | null>(`/api/descuentos/aplicable/producto/${productoId}`)
 
+export const getDescuentoAplicableOffline = (productoId: number) =>
+  api.getCached<DescuentoView | null>(
+    `descuentoAplicable:${productoId}`,
+    `/api/descuentos/aplicable/producto/${productoId}`,
+  )
+
 export const listarDescuentosTicket = () =>
   api.get<DescuentoView[]>('/api/descuentos/ticket-activos')
+
+export const listarDescuentosTicketOffline = () =>
+  api.getCached<DescuentoView[]>('descuentosTicket', '/api/descuentos/ticket-activos')

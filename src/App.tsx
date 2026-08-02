@@ -19,10 +19,16 @@ import PlantillasPage from './pages/PlantillasPage'
 import InsumosPage from './pages/InsumosPage'
 import EquilibrioPage from './pages/EquilibrioPage'
 import CosteoPage from './pages/CosteoPage'
+import DesbloquearPage from './pages/DesbloquearPage'
+import CrearPinPage from './pages/CrearPinPage'
+import ActivarPinPage from './pages/ActivarPinPage'
 
 function RequireAuth() {
-  const { user } = useAuth()
-  return user ? <Outlet /> : <Navigate to="/login" replace />
+  const { user, hayPin } = useAuth()
+  if (user) return <Outlet />
+  // Con PIN guardado se puede volver a entrar sin internet; el login normal no.
+  if (hayPin === null) return null // aún consultando IndexedDB
+  return <Navigate to={hayPin ? '/desbloquear' : '/login'} replace />
 }
 
 function RequireAdmin() {
@@ -34,8 +40,11 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/desbloquear" element={<DesbloquearPage />} />
 
       <Route element={<RequireAuth />}>
+        <Route path="/pin" element={<CrearPinPage />} />
+        <Route path="/pin/activar" element={<ActivarPinPage />} />
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/pos" replace />} />
           <Route path="/pos" element={<POSPage />} />

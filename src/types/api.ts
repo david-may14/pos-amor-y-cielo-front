@@ -7,11 +7,17 @@ export type MetodoPago = 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA'
 export interface LoginRequest {
   email: string
   password: string
+  /** Etiqueta del equipo, para poder revocarlo desde el servidor. */
+  dispositivo?: string
 }
 export interface LoginResponse {
   token: string
+  /** Token de larga duración con el que se renueva el access token. */
+  refreshToken: string
   nombre: string
   rol: Rol
+  /** Si el usuario ya definió un PIN (vive en el servidor, no en el dispositivo). */
+  tienePin: boolean
 }
 
 // ─── Usuarios ─────────────────────────────────────────────────────────────────
@@ -323,6 +329,9 @@ export interface TurnoDTO {
   cerradoEn: string | null
   conteoEfectivo: number | null
   ventasEfectivo: number | null
+  ventasTarjeta: number | null
+  propinaEfectivo: number | null
+  propinaTarjeta: number | null
   movimientosNeto: number | null
   efectivoEsperado: number | null
   diferencia: number | null
@@ -331,6 +340,24 @@ export interface TurnoDTO {
   ventasTotalActual: number | null
   ventasCountActual: number | null
   movimientos: MovimientoCajaDTO[]
+}
+
+// ─── Cierre mensual ─────────────────────────────────────────────────────────
+export interface CierreMensualDTO {
+  id: number | null
+  anio: number
+  mes: number
+  usuarioNombre: string | null
+  cerradoEn: string | null
+  ventasEfectivo: number
+  ventasTarjeta: number
+  propinaEfectivo: number
+  propinaTarjeta: number
+  costoTotal: number
+  gastosFijos: number
+  utilidadNeta: number
+  ventasCount: number
+  notas: string | null
 }
 
 // ─── Configuración ────────────────────────────────────────────────────────────
@@ -374,6 +401,7 @@ export interface VentaResponse {
   splitGrupo?: string | null
   usuarioId?: number | null
   usuarioNombre?: string | null
+  clientId?: string | null
 }
 export interface ResumenDia {
   fecha: string
@@ -456,6 +484,17 @@ export interface TicketItemRequest {
 }
 export interface CrearTicketRequest {
   nombre?: string | null
+  /** Generado por el dispositivo; permite reenviar sin duplicar. */
+  clientId?: string
+  items: TicketItemRequest[]
+}
+/** Estado completo de una comanda editada sin conexión. */
+export interface SincronizarTicketRequest {
+  clientId: string
+  nombre: string | null
+  estado: 'ABIERTO' | 'COBRADO' | 'CANCELADO'
+  actualizadoEn: string
+  ventaClientId?: string
   items: TicketItemRequest[]
 }
 export interface TicketModificadorResponse {
@@ -475,6 +514,8 @@ export interface TicketItemResponse {
 }
 export interface TicketResponse {
   id: number
+  /** Identificador del dispositivo; casa con la copia local. */
+  clientId: string | null
   nombre: string | null
   estado: 'ABIERTO' | 'COBRADO' | 'CANCELADO'
   ventaId: number | null

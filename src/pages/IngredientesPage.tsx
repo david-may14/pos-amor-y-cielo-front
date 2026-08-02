@@ -262,12 +262,12 @@ export default function IngredientesPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl font-semibold text-stone-800">Ingredientes</h1>
           <p className="text-sm text-stone-400 mt-0.5">Usa la misma unidad en todo: ingrediente, receta e inventario</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => exportarIngredientes()} className="btn-secondary flex items-center gap-1.5 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5 0-4.5 4.5M12 3v13.5m4.5-4.5L12 16.5" />
@@ -500,7 +500,7 @@ export default function IngredientesPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="label">
                   Stock mínimo{' '}

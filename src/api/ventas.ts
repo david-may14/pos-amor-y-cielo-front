@@ -22,4 +22,10 @@ export const crearVenta = (
   descuentoTicketId?: number | null,
   propina?: number,
   splitGrupo?: string | null,
-) => api.post<VentaResponse>('/api/ventas', { items, metodoPago, descuentoTicketId, propina: propina ?? 0, splitGrupo: splitGrupo ?? null })
+  clientId?: string,
+  ocurrioEn?: string,
+) => api.post<VentaResponse>('/api/ventas', {
+  items, metodoPago, descuentoTicketId, propina: propina ?? 0, splitGrupo: splitGrupo ?? null,
+  ...(clientId ? { clientId } : {}),
+  ...(ocurrioEn ? { ocurrioEn } : {}),
+})

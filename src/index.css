@@ -6,10 +6,39 @@
   * {
     box-sizing: border-box;
   }
+  html,
+  body {
+    overflow-x: hidden;
+    width: 100%;
+  }
   body {
     background-color: #faf7f2;
     color: #1a2410;
     font-family: 'Inter', system-ui, sans-serif;
+  }
+  /*
+   * Sin esto el navegador retrasa cada toque para descartar que sea un
+   * doble toque de zoom. En una caja táctil eso se siente como que el
+   * primer toque "no hizo nada".
+   */
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
   }
 }
 

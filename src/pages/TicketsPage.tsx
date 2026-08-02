@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listarTickets, cancelarTicket, historialTickets } from '../api/tickets'
+import { historialTickets } from '../api/tickets'
+import { cancelarTicketLocal, sincronizarTickets, useTicketsAbiertos } from '../db/offlineTickets'
+import { imprimirCuenta } from '../services/printer/cuenta'
+import { isPrinterAvailable } from '../services/printer/connection'
 import type { TicketResponse } from '../types/api'
+import type { TicketLocal } from '../db/offlineDb'
 import Spinner from '../components/Spinner'
 
 const fmt = (n: number) =>
@@ -19,18 +23,20 @@ export default function TicketsPage() {
   const [vista, setVista] = useState<Vista>('abiertas')
 
   // ── Abiertas ────────────────────────────────────────────────────────────────
-  const [tickets, setTickets] = useState<TicketResponse[]>([])
-  const [loadingAbiertas, setLoadingAbiertas] = useState(true)
+  // Salen del almacén local, así que la lista se ve y se edita sin conexión.
+  // useLiveQuery las refresca solas cuando la sincronización trae novedades.
+  const tickets = useTicketsAbiertos()
+  const [loadingAbiertas, setLoadingAbiertas] = useState(false)
   const [errorAbiertas, setErrorAbiertas] = useState('')
-  const [cancelando, setCancelando] = useState<number | null>(null)
-  const [confirmCancel, setConfirmCancel] = useState<TicketResponse | null>(null)
+  const [cancelando, setCancelando] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<TicketLocal | null>(null)
 
   const cargarAbiertas = useCallback(async () => {
     try {
-      setTickets(await listarTickets('ABIERTO'))
+      await sincronizarTickets()
       setErrorAbiertas('')
     } catch (e: unknown) {
-      setErrorAbiertas(e instanceof Error ? e.message : 'Error al cargar')
+      setErrorAbiertas(e instanceof Error ? e.message : 'Error al sincronizar')
     } finally {
       setLoadingAbiertas(false)
     }
@@ -44,10 +50,9 @@ export default function TicketsPage() {
 
   const handleCancelar = async () => {
     if (!confirmCancel) return
-    setCancelando(confirmCancel.id)
+    setCancelando(confirmCancel.clientId)
     try {
-      await cancelarTicket(confirmCancel.id)
-      setTickets((prev) => prev.filter((t) => t.id !== confirmCancel.id))
+      await cancelarTicketLocal(confirmCancel.clientId)
       setConfirmCancel(null)
     } catch (e: unknown) {
       setErrorAbiertas(e instanceof Error ? e.message : 'Error al cancelar')
@@ -85,8 +90,8 @@ export default function TicketsPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 bg-white border-b border-stone-100 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+      <div className="flex-shrink-0 bg-white border-b border-stone-100 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-6">
           <h1 className="text-lg font-semibold text-stone-800">Comandas</h1>
           <div className="flex gap-1 bg-surface-muted rounded-lg p-1">
             {(['abiertas', 'historial'] as Vista[]).map((v) => (
@@ -155,9 +160,9 @@ export default function TicketsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {tickets.map((ticket) => (
                   <TicketCardAbierta
-                    key={ticket.id}
+                    key={ticket.clientId}
                     ticket={ticket}
-                    onCargar={(t) => navigate('/pos', { state: { ticketId: t.id } })}
+                    onCargar={(t) => navigate('/pos', { state: { ticketClientId: t.clientId } })}
                     onCancelar={(t) => setConfirmCancel(t)}
                   />
                 ))}
@@ -235,7 +240,7 @@ export default function TicketsPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
             <h3 className="font-semibold text-stone-800 mb-2">¿Cancelar comanda?</h3>
             <p className="text-sm text-stone-500 mb-1">
-              Ticket #{confirmCancel.id} - {fmtHora(confirmCancel.creadoEn)}
+              {confirmCancel.servidorId ? `Ticket #${confirmCancel.servidorId}` : 'Comanda'} - {fmtHora(confirmCancel.creadoEn)}
               {confirmCancel.nombre ? ` · ${confirmCancel.nombre}` : ''}
             </p>
             <p className="text-sm text-stone-400 mb-5">
@@ -275,11 +280,25 @@ function TicketCardAbierta({
   onCargar,
   onCancelar,
 }: {
-  ticket: TicketResponse
-  onCargar: (t: TicketResponse) => void
-  onCancelar: (t: TicketResponse) => void
+  ticket: TicketLocal
+  onCargar: (t: TicketLocal) => void
+  onCancelar: (t: TicketLocal) => void
 }) {
   const totalItems = ticket.items.reduce((s, i) => s + i.cantidad, 0)
+  const [imprimiendo, setImprimiendo] = useState(false)
+  const [printError, setPrintError] = useState('')
+
+  const handleImprimir = async () => {
+    setPrintError('')
+    setImprimiendo(true)
+    try {
+      await imprimirCuenta(ticket)
+    } catch (e: unknown) {
+      setPrintError(e instanceof Error ? e.message : 'No se pudo imprimir')
+    } finally {
+      setImprimiendo(false)
+    }
+  }
 
   return (
     <div className="bg-white border border-stone-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col">
@@ -287,10 +306,13 @@ function TicketCardAbierta({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-amber-700 truncate">
-              Ticket #{ticket.id} - {fmtHora(ticket.creadoEn)}
+              {ticket.servidorId ? `Ticket #${ticket.servidorId}` : 'Comanda local'} - {fmtHora(ticket.creadoEn)}
             </p>
             {ticket.nombre && (
               <p className="text-xs text-stone-500 truncate mt-0.5">{ticket.nombre}</p>
+            )}
+            {ticket.pendiente && (
+              <p className="text-[10px] text-amber-600 mt-0.5">Sin sincronizar</p>
             )}
           </div>
           <span className="flex-shrink-0 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
@@ -300,8 +322,9 @@ function TicketCardAbierta({
       </div>
 
       <div className="px-4 py-3 flex-1 space-y-1.5">
-        {ticket.items.slice(0, 4).map((item) => (
-          <div key={item.id} className="flex items-center justify-between gap-2 text-xs">
+        {/* Los items locales no tienen id del servidor: la clave sale del índice. */}
+        {ticket.items.slice(0, 4).map((item, idx) => (
+          <div key={`${item.productoId}-${idx}`} className="flex items-center justify-between gap-2 text-xs">
             <span className="text-stone-500 truncate">
               <span className="font-medium text-stone-700">{item.cantidad}×</span> {item.nombreProducto}
             </span>
@@ -318,6 +341,9 @@ function TicketCardAbierta({
           <span className="text-xs text-stone-400">Total estimado</span>
           <span className="text-base font-bold text-stone-800">{fmt(ticket.totalEstimado)}</span>
         </div>
+        {printError && (
+          <p className="text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded-lg">{printError}</p>
+        )}
         <div className="flex gap-2">
           <button
             onClick={() => onCancelar(ticket)}
@@ -328,6 +354,22 @@ function TicketCardAbierta({
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
           </button>
+          {isPrinterAvailable() && (
+            <button
+              onClick={handleImprimir}
+              disabled={imprimiendo}
+              className="p-2 rounded-xl border border-stone-200 text-stone-400 hover:text-forest hover:border-forest/40 transition-colors"
+              title="Imprimir cuenta"
+            >
+              {imprimiendo ? (
+                <Spinner className="w-4 h-4" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
+                </svg>
+              )}
+            </button>
+          )}
           <button
             onClick={() => onCargar(ticket)}
             className="btn-primary flex-1 py-2 text-sm flex items-center justify-center gap-1.5"

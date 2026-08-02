@@ -319,9 +319,9 @@ export default function ProductosPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-xl font-semibold text-stone-800">Productos</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => exportarProductos().catch((e) => setError(e.message))}
             className="btn-secondary flex items-center gap-1.5 text-sm"
@@ -363,9 +363,9 @@ export default function ProductosPage() {
       )}
 
       {/* Filtros */}
-      <div className="flex gap-3 mb-4 items-center">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4 sm:items-center">
         {/* Búsqueda */}
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative flex-1 sm:max-w-xs">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
