@@ -24,9 +24,13 @@ interface Props {
   onRefresh: () => void | Promise<void>
   children: ReactNode
   className?: string
+  /** Apaga el gesto por completo: ni arrastra ni muestra el indicador. */
+  disabled?: boolean
 }
 
-export default function PullToRefresh({ onRefresh, children, className = '' }: Props) {
+export default function PullToRefresh({
+  onRefresh, children, className = '', disabled = false,
+}: Props) {
   const contenedor = useRef<HTMLDivElement>(null)
   const [distancia, setDistancia] = useState(0)
   const [refrescando, setRefrescando] = useState(false)
@@ -47,6 +51,13 @@ export default function PullToRefresh({ onRefresh, children, className = '' }: P
   useEffect(() => {
     const el = contenedor.current
     if (!el) return
+    // Desactivado no se registra nada: no hay gesto que interceptar, y así el
+    // scroll normal del contenido se comporta como si este componente no
+    // estuviera en medio.
+    if (disabled) {
+      mover(0)
+      return
+    }
 
     const alEmpezar = (e: TouchEvent) => {
       // Solo cuenta si ya se está hasta arriba: si no, el dedo está haciendo
@@ -104,7 +115,7 @@ export default function PullToRefresh({ onRefresh, children, className = '' }: P
       el.removeEventListener('touchend', alSoltar)
       el.removeEventListener('touchcancel', alSoltar)
     }
-  }, [])
+  }, [disabled])
 
   const listo = distancia >= UMBRAL
 

@@ -139,7 +139,15 @@ export default function CocinaPage() {
 
       {/* El gesto envuelve también los estados vacíos: cuando no hay nada en
           pantalla es justo cuando uno quiere tirar para ver si ya llegó algo. */}
-      <PullToRefresh onRefresh={refrescar} className="flex-1">
+      <PullToRefresh
+        onRefresh={refrescar}
+        className="flex-1"
+        // Con la caja cerrada no hay nada que traer: el gesto solo generaría
+        // peticiones. Despertar la pantalla queda en el botón del estado
+        // vacío, que es un toque deliberado y no algo que salga de repetir un
+        // deslizamiento sin pensar.
+        disabled={!estado.turnoAbierto}
+      >
         {fallo ? (
         <Fallo mensaje={fallo} onReintentar={refrescar} />
       ) : !estado.turnoAbierto ? (
@@ -223,17 +231,37 @@ function Fallo({ mensaje, onReintentar }: { mensaje: string; onReintentar: () =>
  * necesita decir cómo se despierta: si no, al abrir turno por la mañana parece
  * que la tablet se quedó colgada.
  */
-function SinTurno({ onActualizar }: { onActualizar: () => void }) {
+function SinTurno({ onActualizar }: { onActualizar: () => Promise<void> }) {
+  const [comprobando, setComprobando] = useState(false)
+
+  // El botón es la única puerta de entrada mientras la caja está cerrada, así
+  // que se bloquea mientras hay una consulta en vuelo: no tendría sentido
+  // apagar el sondeo para luego permitir diez toques seguidos.
+  const comprobar = async () => {
+    if (comprobando) return
+    setComprobando(true)
+    try {
+      await onActualizar()
+    } finally {
+      setComprobando(false)
+    }
+  }
+
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-8">
       <div className="text-center max-w-sm">
         <p className="text-lg font-medium text-stone-700">No hay turno abierto</p>
         <p className="text-sm text-stone-500 mt-2">
-          Las comandas aparecen aquí cuando alguien abre la caja. Desliza hacia
-          abajo o toca el botón para volver a comprobarlo.
+          Las comandas aparecen aquí cuando alguien abre la caja. Toca el botón
+          para volver a comprobarlo.
         </p>
-        <button onClick={onActualizar} className="btn-primary mt-5 px-6 py-2">
-          Comprobar ahora
+        <button
+          onClick={comprobar}
+          disabled={comprobando}
+          className="btn-primary mt-5 px-6 py-2 inline-flex items-center gap-2"
+        >
+          {comprobando && <Spinner className="w-4 h-4 text-cream" />}
+          {comprobando ? 'Comprobando…' : 'Comprobar ahora'}
         </button>
       </div>
     </div>
