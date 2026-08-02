@@ -530,3 +530,37 @@ export interface CobrarTicketRequest {
   descuentoTicketId?: number | null
   propina?: number
 }
+
+// ── Pantalla de cocina ───────────────────────────────────────────────────────
+// Estas formas NO llevan importes. El endpoint que las sirve es público (la
+// tablet de cocina no inicia sesión), así que el backend omite precios y
+// totales a propósito: lo que puede filtrarse es qué se está preparando, nunca
+// cuánto factura el negocio. Por eso no se reutiliza TicketResponse.
+
+export type EstadoPreparacion = 'PENDIENTE' | 'EN_PROCESO' | 'LISTO'
+
+export interface ItemCocina {
+  id: number
+  nombreProducto: string
+  cantidad: number
+  notas: string | null
+  modificadores: string[]
+}
+
+export interface ComandaCocina {
+  id: number
+  nombre: string | null
+  estadoPreparacion: EstadoPreparacion
+  /** Ya se cobró: el cliente está esperando su pedido. */
+  cobrada: boolean
+  creadoEn: string
+  preparacionIniciadaEn: string | null
+  listoEn: string | null
+  items: ItemCocina[]
+}
+
+export interface EstadoCocina {
+  turnoAbierto: boolean
+  pendientes: ComandaCocina[]
+  entregadas: ComandaCocina[]
+}
