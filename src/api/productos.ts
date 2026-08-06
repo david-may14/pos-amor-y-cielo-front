@@ -28,9 +28,13 @@ export const reemplazarReceta = (id: number, lineas: RecetaLineaRequest[]) =>
 export const listarModificadoresProducto = (id: number) =>
   api.get<ModificadorGrupo[]>(`/api/productos/${id}/modificadores`)
 
-/** Cachea por producto: solo estará disponible offline si ya se consultó una vez con conexión. */
+/**
+ * Responde con la copia local y refresca por detrás: se consulta en cada toque
+ * de producto durante una venta, así que esperar a la red ahí se paga con el
+ * cliente enfrente. La primera vez que se toca un producto sí espera.
+ */
 export const listarModificadoresProductoOffline = (id: number) =>
-  api.getCached<ModificadorGrupo[]>(`modificadores:${id}`, `/api/productos/${id}/modificadores`)
+  api.getCachedFirst<ModificadorGrupo[]>(`modificadores:${id}`, `/api/productos/${id}/modificadores`)
 
 export const asignarModificador = (productoId: number, grupoId: number) =>
   api.post<null>(`/api/productos/${productoId}/modificadores/${grupoId}`, {})
