@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { obtenerTurnoActivoOffline } from '../api/turnos'
+import { invalidarCache } from '../api/client'
 import { offlineDb } from '../db/offlineDb'
 import type { TurnoDTO } from '../types/api'
 import { useAuth } from './AuthContext'
@@ -41,6 +42,15 @@ export function TurnoProvider({ children }: { children: ReactNode }) {
   const actualizarTurno = useCallback((t: TurnoDTO | null) => {
     setTurno(t)
     offlineDb.cache.put({ key: CACHE_KEY, data: t, actualizadoEn: new Date().toISOString() }).catch(() => {})
+
+    // Abrir turno es el momento de tirar lo que el POS trae cacheado de
+    // modificadores y descuentos. Durante el servicio esas claves se sirven de
+    // la copia local para que cada toque de producto sea inmediato, así que sin
+    // esto un descuento creado entre turnos tardaría un toque en aparecer.
+    if (t && t.estado === 'ABIERTO') {
+      invalidarCache('modificadores:').catch(() => {})
+      invalidarCache('descuentoAplicable:').catch(() => {})
+    }
   }, [])
 
   return (

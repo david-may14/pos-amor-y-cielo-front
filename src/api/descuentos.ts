@@ -32,8 +32,9 @@ export const quitarProducto = (id: number, prodId: number) =>
 export const getDescuentoAplicable = (productoId: number) =>
   api.get<DescuentoView | null>(`/api/descuentos/aplicable/producto/${productoId}`)
 
+/** Caché primero, igual que los modificadores: se pide en el mismo toque. */
 export const getDescuentoAplicableOffline = (productoId: number) =>
-  api.getCached<DescuentoView | null>(
+  api.getCachedFirst<DescuentoView | null>(
     `descuentoAplicable:${productoId}`,
     `/api/descuentos/aplicable/producto/${productoId}`,
   )
