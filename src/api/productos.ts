@@ -1,7 +1,7 @@
 import { api, descargarArchivo, subirArchivo } from './client'
-import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, ModificadorGrupo, PlantillaDTO, ImportPreviewResult, ImportResult, CosteoDTO } from '../types/api'
+import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, ModificadorGrupo, PlantillaDTO, ImportPreviewResult, ImportResult, CosteoDTO, CosteoResumenDTO } from '../types/api'
 
-export const listarCosteo = () => api.get<CosteoDTO[]>('/api/productos/costeo')
+export const listarCosteo = () => api.get<CosteoResumenDTO[]>('/api/productos/costeo')
 export const detalleCosteo = (id: number) => api.get<CosteoDTO>(`/api/productos/${id}/costeo`)
 
 export const listarProductos = () => api.get<ProductoDTO[]>('/api/productos')

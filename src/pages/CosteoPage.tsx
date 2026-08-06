@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { listarCosteo, detalleCosteo, actualizarMargenSeguridad, actualizarPrecioProducto } from '../api/productos'
 import { obtenerConfiguracion } from '../api/configuracion'
-import type { CosteoDTO } from '../types/api'
+import type { CosteoDTO, CosteoResumenDTO } from '../types/api'
 import Spinner from '../components/Spinner'
 import { LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 
@@ -89,7 +89,7 @@ function GraficaHistorial({ historial }: { historial: CosteoDTO['historial'] }) 
 }
 
 export default function CosteoPage() {
-  const [productos, setProductos] = useState<CosteoDTO[]>([])
+  const [productos, setProductos] = useState<CosteoResumenDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [expandido, setExpandido] = useState<number | null>(null)
@@ -115,7 +115,7 @@ export default function CosteoPage() {
   const [soloSinReceta, setSoloSinReceta] = useState(false)
 
   // costoBase = costoConMargen si existe, si no costoTotal
-  const costoBase = (p: CosteoDTO) => p.costoConMargen ?? p.costoTotal
+  const costoBase = (p: CosteoResumenDTO | CosteoDTO) => p.costoConMargen ?? p.costoTotal
 
   const margenRealPct = (precioVenta: number, base: number) => {
     if (base <= 0 || precioVenta <= 0) return null
@@ -230,7 +230,9 @@ export default function CosteoPage() {
     guardarPrecio(productoId, precio)
   }
 
-  const sinReceta = (p: CosteoDTO) => p.costoTotal === 0 && p.ingredientesDirectos.length === 0 && p.plantillas.length === 0
+  // sinReceta lo decide el backend: la lista ya no baja las líneas de
+  // ingredientes, así que aquí no hay con qué deducirlo.
+  const sinReceta = (p: CosteoResumenDTO) => p.costoTotal === 0 && p.sinReceta
   const sinRecetaCount = productos.filter(sinReceta).length
 
   const filtrados = productos

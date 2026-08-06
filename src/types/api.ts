@@ -97,6 +97,26 @@ export interface SnapshotCosteo {
   costoTotal: number
   precioVenta: number
 }
+/**
+ * Fila de la tabla de costeo. Sin líneas de ingredientes ni historial: eso se
+ * pide con detalleCosteo al expandir un producto. Bajarlo para todo el catálogo
+ * costaba del orden de mil consultas contra la base remota.
+ */
+export interface CosteoResumenDTO {
+  productoId: number
+  nombre: string
+  categoria: string | null
+  precioVenta: number
+  costoTotal: number
+  margen: number
+  margenPorcentaje: number
+  margenSeguridad: number | null
+  costoConMargen: number | null
+  /** Ni receta ni plantillas. Lo calcula el backend porque aquí ya no llegan. */
+  sinReceta: boolean
+}
+
+/** Costeo completo de un producto, con el desglose que muestra la fila expandida. */
 export interface CosteoDTO {
   productoId: number
   nombre: string
