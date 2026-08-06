@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { costeoCompleto } from '../api/productos'
+import { costeoCompletoPagina } from '../api/productos'
 import { obtenerConfiguracion } from '../api/configuracion'
 import type { CosteoDTO } from '../types/api'
 import { GraficaDesglose, GraficaHistorial } from '../components/GraficasCosteo'
@@ -21,6 +21,9 @@ import Spinner from '../components/Spinner'
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
+/** Productos por tanda. Acota el pico de memoria del servidor. */
+const TAMANO_TANDA = 25
+
 /** Ancho fijo para la gráfica de historial: al imprimir el responsive falla. */
 const ANCHO_GRAFICA = 640
 
@@ -37,11 +40,40 @@ export default function CosteoReportePage() {
   const categoria = params.get('categoria') ?? 'Todos'
   const busqueda = (params.get('q') ?? '').toLowerCase()
 
+  /**
+   * Se piden tandas de 25 en serie, no todas a la vez.
+   *
+   * En paralelo el servidor tendría el catálogo entero en memoria igual, que es
+   * exactamente lo que la paginación evita: la instancia corre con heap corto y
+   * Serial GC, y ese pico deja pausas que frenan también al POS y a cocina.
+   * Encadenarlas es más lento de reloj y mucho más sano para todos.
+   */
   useEffect(() => {
-    Promise.all([costeoCompleto(), obtenerConfiguracion()])
-      .then(([prods, config]) => { setProductos(prods); setIva(config.ivaPorcentaje) })
-      .catch((e) => setError(e instanceof Error ? e.message : 'No se pudo cargar el costeo'))
-      .finally(() => setCargando(false))
+    let cancelado = false
+
+    const cargar = async () => {
+      try {
+        const config = await obtenerConfiguracion()
+        if (cancelado) return
+        setIva(config.ivaPorcentaje)
+
+        const acumulado: CosteoDTO[] = []
+        for (let desde = 0; ; desde += TAMANO_TANDA) {
+          const tanda = await costeoCompletoPagina(desde, TAMANO_TANDA)
+          if (cancelado) return
+          acumulado.push(...tanda)
+          setProductos([...acumulado])
+          if (tanda.length < TAMANO_TANDA) break
+        }
+      } catch (e) {
+        if (!cancelado) setError(e instanceof Error ? e.message : 'No se pudo cargar el costeo')
+      } finally {
+        if (!cancelado) setCargando(false)
+      }
+    }
+
+    cargar()
+    return () => { cancelado = true }
   }, [])
 
   const filtrados = useMemo(() => productos.filter(p =>
@@ -64,7 +96,10 @@ export default function CosteoReportePage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Spinner className="w-8 h-8 text-forest mx-auto" />
-          <p className="text-sm text-stone-500 mt-3">Reuniendo el costeo del catálogo…</p>
+          <p className="text-sm text-stone-500 mt-3">
+            Reuniendo el costeo del catálogo…
+            {productos.length > 0 && ` ${productos.length} productos`}
+          </p>
         </div>
       </div>
     )

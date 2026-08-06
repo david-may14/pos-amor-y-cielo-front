@@ -5,11 +5,15 @@ export const listarCosteo = () => api.get<CosteoResumenDTO[]>('/api/productos/co
 export const detalleCosteo = (id: number) => api.get<CosteoDTO>(`/api/productos/${id}/costeo`)
 
 /**
- * Catálogo completo con desglose e historial. Solo lo usa el reporte
- * imprimible: es pesado a propósito, y sin él habría que pedir el detalle
- * producto por producto.
+ * Una tanda del catálogo con desglose e historial. Solo lo usa el reporte
+ * imprimible.
+ *
+ * Va paginado porque el servidor corre con poca memoria: pedirlo entero de una
+ * vez le dejaba pausas de recolección que frenaban TODAS las peticiones, no
+ * solo esta. El reporte encadena tandas hasta juntar el catálogo.
  */
-export const costeoCompleto = () => api.get<CosteoDTO[]>('/api/productos/costeo/completo')
+export const costeoCompletoPagina = (desde: number, limite = 25) =>
+  api.get<CosteoDTO[]>(`/api/productos/costeo/completo?desde=${desde}&limite=${limite}`)
 
 export const listarProductos = () => api.get<ProductoDTO[]>('/api/productos')
 
