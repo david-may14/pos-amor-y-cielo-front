@@ -22,6 +22,7 @@ import CosteoPage from './pages/CosteoPage'
 import DesbloquearPage from './pages/DesbloquearPage'
 import CrearPinPage from './pages/CrearPinPage'
 import ActivarPinPage from './pages/ActivarPinPage'
+import CocinaPage from './pages/CocinaPage'
 
 function RequireAuth() {
   const { user, hayPin } = useAuth()
@@ -41,6 +42,9 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/desbloquear" element={<DesbloquearPage />} />
+      {/* Pública a propósito: la tablet de cocina no inicia sesión. Se entra
+          con el botón del login y se queda puesta todo el día. */}
+      <Route path="/cocina" element={<CocinaPage />} />
 
       <Route element={<RequireAuth />}>
         <Route path="/pin" element={<CrearPinPage />} />

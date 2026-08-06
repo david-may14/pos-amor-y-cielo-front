@@ -79,6 +79,24 @@ export async function obtenerTicketLocal(clientId: string): Promise<TicketLocal 
   return offlineDb.tickets.get(clientId)
 }
 
+/**
+ * ¿Llegó esta comanda al servidor? La pantalla de cocina solo ve lo que está
+ * sincronizado, así que cuando la respuesta es no, el POS ofrece imprimirla:
+ * es la única forma de que la barra se entere del pedido.
+ *
+ * Reintentar es gratis — la sincronización es idempotente por clientId — así
+ * que se fuerza un intento antes de contestar en vez de fiarse de la bandera.
+ */
+export async function comandaLlegoAlServidor(clientId: string): Promise<boolean> {
+  try {
+    await sincronizarTickets()
+  } catch {
+    return false
+  }
+  const t = await offlineDb.tickets.get(clientId)
+  return t ? !t.pendiente : false
+}
+
 export async function listarTicketsAbiertos(): Promise<TicketLocal[]> {
   const abiertos = await offlineDb.tickets.where('estado').equals('ABIERTO').toArray()
   return abiertos.sort((a, b) => a.creadoEn.localeCompare(b.creadoEn))

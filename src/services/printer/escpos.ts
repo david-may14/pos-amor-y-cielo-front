@@ -49,6 +49,16 @@ export class ReceiptBuilder {
     return this.push(ESC, 0x45, on ? 1 : 0) // ESC E n
   }
 
+  /**
+   * Multiplica el tamaño del carácter (1–8 en cada eje). Lo usa la comanda de
+   * cocina: ese papel se lee de reojo desde la barra, no en la mano como un
+   * recibo. Ojo, a doble ancho caben la mitad de caracteres por línea.
+   */
+  size(ancho: number, alto: number): this {
+    const n = ((Math.min(8, Math.max(1, ancho)) - 1) << 4) | (Math.min(8, Math.max(1, alto)) - 1)
+    return this.push(GS, 0x21, n) // GS ! n
+  }
+
   text(str: string): this {
     this.bytes.push(...encodeWin1252(str))
     return this

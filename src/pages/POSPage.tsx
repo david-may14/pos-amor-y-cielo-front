@@ -6,10 +6,12 @@ import { crearVenta } from '../api/ventas'
 import { getDescuentoAplicableOffline, listarDescuentosOffline, listarDescuentosTicketOffline } from '../api/descuentos'
 import {
   crearTicketLocal, actualizarTicketLocal, obtenerTicketLocal, marcarTicketCobrado,
+  comandaLlegoAlServidor,
 } from '../db/offlineTickets'
 import type { TicketLocal } from '../db/offlineDb'
 import { obtenerEquilibrio } from '../api/equilibrio'
 import { imprimirRecibo } from '../services/printer/recibo'
+import { imprimirComanda } from '../services/printer/comanda'
 import { isPrinterAvailable } from '../services/printer/connection'
 import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
@@ -262,6 +264,36 @@ export default function POSPage() {
     setShowGuardarTicket(true)
   }
 
+  /**
+   * Si la comanda no llegó al servidor, cocina no la va a ver en pantalla: se
+   * imprime para que la barra se entere igual. Se hace solo y no preguntando,
+   * porque el pedido ya está tomado y el cliente está esperando.
+   */
+  const respaldarEnPapelSiNoLlego = async (comanda: TicketLocal) => {
+    const llego = await comandaLlegoAlServidor(comanda.clientId)
+    if (llego) return
+
+    if (!isPrinterAvailable()) {
+      setError('Comanda guardada sin conexión. Avisa a cocina: no hay impresora para respaldarla.')
+      return
+    }
+    try {
+      await imprimirComanda({
+        nombre: comanda.nombre,
+        creadoEn: comanda.creadoEn,
+        items: comanda.items.map(i => ({
+          cantidad: i.cantidad,
+          nombreProducto: i.nombreProducto,
+          notas: i.notas,
+          modificadores: i.modificadores,
+        })),
+      })
+      setError('Sin conexión: la comanda se imprimió para cocina.')
+    } catch {
+      setError('Comanda guardada sin conexión y no se pudo imprimir. Avisa a cocina.')
+    }
+  }
+
   const handleGuardarTicket = async () => {
     if (cart.length === 0) return
     setSavingTicket(true)
@@ -276,7 +308,8 @@ export default function POSPage() {
         const t = await obtenerTicketLocal(ticketActivo.clientId)
         if (t) setTicketActivo(t)
       } else {
-        await crearTicketLocal(nombre, items)
+        const creada = await crearTicketLocal(nombre, items)
+        await respaldarEnPapelSiNoLlego(creada)
         clearCart()
         setTicketActivo(null)
       }

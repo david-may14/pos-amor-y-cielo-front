@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Spinner from '../components/Spinner'
 
@@ -140,6 +140,18 @@ export default function LoginPage() {
               {loading ? 'Entrando…' : 'Entrar'}
             </button>
           </form>
+
+          {/* Cocina entra sin sesión: la tablet de la barra se queda todo el
+              día en esa pantalla y nadie quiere teclear credenciales con las
+              manos mojadas. Solo muestra qué preparar, nunca importes. */}
+          <div className="mt-6 pt-6 border-t border-stone-100 text-center">
+            <Link
+              to="/cocina"
+              className="text-sm font-medium text-forest hover:text-forest-dark underline underline-offset-4"
+            >
+              Ver órdenes de cocina
+            </Link>
+          </div>
         </div>
       </div>
 
