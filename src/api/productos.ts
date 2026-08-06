@@ -4,6 +4,13 @@ import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, 
 export const listarCosteo = () => api.get<CosteoResumenDTO[]>('/api/productos/costeo')
 export const detalleCosteo = (id: number) => api.get<CosteoDTO>(`/api/productos/${id}/costeo`)
 
+/**
+ * Catálogo completo con desglose e historial. Solo lo usa el reporte
+ * imprimible: es pesado a propósito, y sin él habría que pedir el detalle
+ * producto por producto.
+ */
+export const costeoCompleto = () => api.get<CosteoDTO[]>('/api/productos/costeo/completo')
+
 export const listarProductos = () => api.get<ProductoDTO[]>('/api/productos')
 
 /** Para la caja (POSPage): cachea el catálogo para poder vender sin conexión. */

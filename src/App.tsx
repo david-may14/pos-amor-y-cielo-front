@@ -19,6 +19,7 @@ import PlantillasPage from './pages/PlantillasPage'
 import InsumosPage from './pages/InsumosPage'
 import EquilibrioPage from './pages/EquilibrioPage'
 import CosteoPage from './pages/CosteoPage'
+import CosteoReportePage from './pages/CosteoReportePage'
 import DesbloquearPage from './pages/DesbloquearPage'
 import CrearPinPage from './pages/CrearPinPage'
 import ActivarPinPage from './pages/ActivarPinPage'
@@ -49,6 +50,13 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route path="/pin" element={<CrearPinPage />} />
         <Route path="/pin/activar" element={<ActivarPinPage />} />
+
+        {/* Fuera del Layout a propósito: lo que se imprime es un documento, no
+            una pantalla de la app con barra lateral y navegación. */}
+        <Route element={<RequireAdmin />}>
+          <Route path="/costeo/reporte" element={<CosteoReportePage />} />
+        </Route>
+
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/pos" replace />} />
           <Route path="/pos" element={<POSPage />} />
