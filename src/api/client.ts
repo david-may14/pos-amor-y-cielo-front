@@ -87,34 +87,26 @@ async function getCached<T>(key: string, path: string): Promise<T> {
 }
 
 /**
- * Como getCached, pero responde con lo cacheado SIN esperar a la red y refresca
- * por detrás para el próximo uso.
+ * Responde con la copia local y NO va a la red si la hay.
  *
- * Es para lo que se consulta en mitad de una venta, con el cliente enfrente:
- * ahí la diferencia entre responder al instante y esperar un viaje a Railway y
- * de ahí a Supabase se nota en cada toque. Los datos que la usan —modificadores
- * de un producto, descuentos vigentes— practicamente no cambian durante un
- * turno, así que servir la copia local y actualizarla después es un intercambio
- * barato.
+ * Es para los datos que en un POS son constantes casi todo el tiempo —los
+ * modificadores de un producto, sus descuentos vigentes—: no cambian solos a
+ * media venta, así que preguntar por ellos en cada toque es tráfico que no
+ * compra nada y que encima compite con lo que sí importa durante el servicio.
  *
- * A cambio, un cambio hecho desde otro equipo tarda un toque en aparecer: el
- * primero devuelve lo viejo y deja lo nuevo listo para el siguiente.
+ * Quién los mantiene frescos entonces: `precargarCatalogo()`, que los baja
+ * todos de una vez al abrir la app, al recuperar conexión y al abrir turno. Es
+ * el mismo criterio que usan los POS de escritorio — tardar un momento al
+ * arrancar y después operar en local — y concentra el costo en un momento en
+ * el que nadie tiene un cliente enfrente.
  *
- * La primera vez que se pide algo no hay copia, así que ahí sí se espera.
+ * Sin copia local sí se va a la red, que es el caso de un producto nuevo
+ * creado después de la última precarga.
  */
-async function getCachedFirst<T>(key: string, path: string): Promise<T> {
+async function getCacheado<T>(key: string, path: string): Promise<T> {
   const entry = await offlineDb.cache.get(key).catch(() => undefined)
-  if (!entry) return getCached<T>(key, path)
-
-  // Sin await: el refresco no debe retrasar lo que ya podemos responder. Si
-  // falla —sin red, sesión caída— se ignora y queda la copia local, que es
-  // justo lo que se acaba de devolver.
-  request<T>(path)
-    .then((data) =>
-      offlineDb.cache.put({ key, data, actualizadoEn: new Date().toISOString() }))
-    .catch(() => {})
-
-  return entry.data as T
+  if (entry) return entry.data as T
+  return getCached<T>(key, path)
 }
 
 /** Olvida lo cacheado bajo esas claves para que la próxima lectura vaya a la red. */
@@ -192,7 +184,7 @@ export async function subirArchivo<T>(path: string, file: File): Promise<T> {
 export const api = {
   get: <T>(path: string) => request<T>(path),
   getCached: <T>(key: string, path: string) => getCached<T>(key, path),
-  getCachedFirst: <T>(key: string, path: string) => getCachedFirst<T>(key, path),
+  getCacheado: <T>(key: string, path: string) => getCacheado<T>(key, path),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
