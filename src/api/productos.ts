@@ -4,6 +4,17 @@ import type { ProductoDTO, ProductoRequest, RecetaLineaDTO, RecetaLineaRequest, 
 export const listarCosteo = () => api.get<CosteoResumenDTO[]>('/api/productos/costeo')
 export const detalleCosteo = (id: number) => api.get<CosteoDTO>(`/api/productos/${id}/costeo`)
 
+/**
+ * Una tanda del catálogo con desglose e historial. Solo lo usa el reporte
+ * imprimible.
+ *
+ * Va paginado porque el servidor corre con poca memoria: pedirlo entero de una
+ * vez le dejaba pausas de recolección que frenaban TODAS las peticiones, no
+ * solo esta. El reporte encadena tandas hasta juntar el catálogo.
+ */
+export const costeoCompletoPagina = (desde: number, limite = 25) =>
+  api.get<CosteoDTO[]>(`/api/productos/costeo/completo?desde=${desde}&limite=${limite}`)
+
 export const listarProductos = () => api.get<ProductoDTO[]>('/api/productos')
 
 /** Para la caja (POSPage): cachea el catálogo para poder vender sin conexión. */

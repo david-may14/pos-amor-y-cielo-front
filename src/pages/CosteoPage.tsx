@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { listarCosteo, detalleCosteo, actualizarMargenSeguridad, actualizarPrecioProducto } from '../api/productos'
 import { obtenerConfiguracion } from '../api/configuracion'
 import type { CosteoDTO, CosteoResumenDTO } from '../types/api'
 import Spinner from '../components/Spinner'
-import { LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
+import { GraficaDesglose, GraficaHistorial } from '../components/GraficasCosteo'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
@@ -21,74 +22,8 @@ function FoodCostBadge({ pct }: { pct: number }) {
   return <span className={`font-semibold ${color}`}>{pct.toFixed(1)}%</span>
 }
 
-const COLORES_ING = ['#4d6335', '#7a9d4d', '#a8c68f', '#f97316', '#fb923c', '#fbbf24', '#60a5fa', '#a78bfa']
-
-function GraficaDesglose({ detalle }: { detalle: CosteoDTO }) {
-  const lineas = [
-    ...detalle.ingredientesDirectos.map(l => ({ name: l.nombre, value: Number(l.costoLinea) })),
-    ...detalle.plantillas.flatMap(pl => pl.ingredientes.map(l => ({ name: l.nombre, value: Number(l.costoLinea) }))),
-  ].filter(l => l.value > 0).sort((a, b) => b.value - a.value)
-
-  if (lineas.length === 0) return (
-    <p className="text-xs text-stone-400 italic">Sin ingredientes — asigna una receta primero</p>
-  )
-
-  return (
-    <div className="flex items-center gap-4">
-      <ResponsiveContainer width={180} height={180}>
-        <PieChart>
-          <Pie data={lineas} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={36}>
-            {lineas.map((_, i) => <Cell key={i} fill={COLORES_ING[i % COLORES_ING.length]} />)}
-          </Pie>
-          <Tooltip
-            contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: 11 }}
-            formatter={(v: number) => fmt(v)}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="flex-1 space-y-1.5">
-        {lineas.map((l, i) => (
-          <div key={i} className="flex items-center gap-2 text-xs">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORES_ING[i % COLORES_ING.length] }} />
-            <span className="text-stone-600 flex-1 truncate">{l.name}</span>
-            <span className="text-stone-700 font-medium shrink-0">{fmt(l.value)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function GraficaHistorial({ historial }: { historial: CosteoDTO['historial'] }) {
-  if (historial.length === 0) return (
-    <p className="text-xs text-stone-400 italic">Guarda la receta para registrar el primer punto del historial</p>
-  )
-  const data = [...historial].reverse().map(h => ({
-    fecha: h.fecha.slice(5),
-    costo: Number(h.costoTotal.toFixed(2)),
-    precio: Number(h.precioVenta.toFixed(2)),
-    margen: Number((h.precioVenta - h.costoTotal).toFixed(2)),
-  }))
-  return (
-    <ResponsiveContainer width="100%" height={180}>
-      <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f0" />
-        <XAxis dataKey="fecha" tick={{ fontSize: 10 }} stroke="#9ca3af" />
-        <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" tickFormatter={v => `$${v}`} />
-        <Tooltip
-          contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: 11 }}
-          formatter={(v: number) => fmt(v)}
-        />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Line type="monotone" dataKey="costo" name="Costo" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-        <Line type="monotone" dataKey="precio" name="Precio" stroke="#4d6335" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
-        <Line type="monotone" dataKey="margen" name="Margen" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
-      </LineChart>
-    </ResponsiveContainer>
-  )
-}
-
 export default function CosteoPage() {
+  const navigate = useNavigate()
   const [productos, setProductos] = useState<CosteoResumenDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -256,6 +191,15 @@ export default function CosteoPage() {
       return sortDir === 'asc' ? diff : -diff
     })
 
+  /** Abre el reporte imprimible con los filtros que están puestos ahora. */
+  const abrirReporte = () => {
+    const q = new URLSearchParams()
+    if (categoria !== 'Todos') q.set('categoria', categoria)
+    if (busqueda.trim()) q.set('q', busqueda.trim())
+    const cadena = q.toString()
+    navigate(`/costeo/reporte${cadena ? `?${cadena}` : ''}`)
+  }
+
   const exportarCSV = () => {
     const fmtN = (n: number | null | undefined) => n != null ? n.toFixed(4) : ''
     const headers = ['Producto','Categoría','Costo real','Costo con margen','Precio','Food cost %','Margen % neto','Margen $ neto']
@@ -313,6 +257,18 @@ export default function CosteoPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5 0-4.5 4.5M12 3v13.5m4.5-4.5L12 16.5" />
             </svg>
             CSV
+          </button>
+          {/* Se llevan los filtros puestos: el reporte cubre lo mismo que
+              estás viendo, no siempre el catálogo entero. */}
+          <button
+            onClick={abrirReporte}
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+            title="Reporte con gráficas para compartir o imprimir"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659" />
+            </svg>
+            Reporte
           </button>
         </div>
       </div>

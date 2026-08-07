@@ -67,3 +67,43 @@
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #c9bfb0; border-radius: 3px; }
+
+/* ── Impresión del reporte de costeo ────────────────────────────────────────
+   El PDF lo genera el navegador con window.print(), así que estas reglas son
+   todo el "motor" de maquetación que hay. Sin librería de PDF de por medio. */
+@media print {
+  /* Los navegadores tiran los fondos al imprimir para ahorrar tinta; aquí los
+     colores son información (rojo = se vende por debajo del costo), no adorno. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print { display: none !important; }
+
+  /* La app monta el reporte dentro del layout normal; al imprimir el documento
+     manda y no debe quedar encajado en un contenedor con scroll. */
+  html, body, #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .reporte { min-height: 0 !important; }
+
+  /* Una ficha partida a la mitad entre dos hojas es ilegible: la gráfica queda
+     en una página y sus cifras en la siguiente. */
+  .ficha {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Los encabezados de la tabla resumen se repiten si abarca varias hojas. */
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+}
