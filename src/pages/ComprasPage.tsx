@@ -55,6 +55,7 @@ export default function ComprasPage() {
   const [leyendo, setLeyendo] = useState(false)
   const [borrador, setBorrador] = useState<Borrador | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [arrastrando, setArrastrando] = useState(false)
 
   const inputFoto = useRef<HTMLInputElement>(null)
 
@@ -90,12 +91,61 @@ export default function ComprasPage() {
     return Object.entries(resumen.porCategoria).sort((a, b) => b[1] - a[1])
   }, [resumen])
 
-  /** Foto → propuesta. Si la lectura falla, se abre el borrador vacío para capturar a mano. */
-  const alElegirFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const alElegirFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''   // permite volver a elegir la misma foto
-    if (!file) return
+    if (file) procesarArchivo(file)
+  }
 
+  const alSoltar = (e: React.DragEvent) => {
+    e.preventDefault()
+    setArrastrando(false)
+    const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'))
+    if (!file) {
+      setError('Eso no es una imagen. Arrastra la foto del ticket.')
+      return
+    }
+    procesarArchivo(file)
+  }
+
+  /**
+   * Pegar la imagen con Ctrl+V. En una computadora es lo más rápido: recortas
+   * el ticket, copias, pegas — sin pasar por el disco.
+   *
+   * Se ignora en dos casos, y los dos importan: cuando el foco está en un campo
+   * de texto (pegar ahí es pegar texto, no adjuntar una foto) y cuando hay un
+   * borrador abierto (pegar lo reemplazaría y se perdería lo ya corregido).
+   */
+  const borradorRef = useRef(borrador)
+  borradorRef.current = borrador
+
+  useEffect(() => {
+    if (!conCamara) return
+
+    const alPegar = (e: ClipboardEvent) => {
+      const destino = e.target as HTMLElement | null
+      if (destino && (destino.tagName === 'INPUT' || destino.tagName === 'TEXTAREA'
+              || destino.isContentEditable)) return
+      if (borradorRef.current) return
+
+      const item = Array.from(e.clipboardData?.items ?? [])
+              .find(i => i.type.startsWith('image/'))
+      const file = item?.getAsFile()
+      if (!file) return
+
+      e.preventDefault()
+      procesarArchivo(file)
+    }
+
+    document.addEventListener('paste', alPegar)
+    return () => document.removeEventListener('paste', alPegar)
+    // procesarArchivo se recrea en cada render pero solo lee estado por setters,
+    // asi que registrar una vez por disponibilidad de camara es suficiente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conCamara])
+
+  /** Foto → propuesta. Si la lectura falla, se abre el borrador vacío para capturar a mano. */
+  const procesarArchivo = async (file: File) => {
     setLeyendo(true)
     setError('')
     try {
@@ -218,7 +268,17 @@ export default function ComprasPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-5">
+      {/* Toda la zona de botones acepta que le suelten la foto encima. En una
+          computadora arrastrar es mas directo que abrir el selector; en un
+          telefono estos eventos no se disparan nunca, asi que no estorba. */}
+      <div
+        onDragOver={(e) => { if (conCamara) { e.preventDefault(); setArrastrando(true) } }}
+        onDragLeave={() => setArrastrando(false)}
+        onDrop={(e) => { if (conCamara) alSoltar(e) }}
+        className={`flex flex-wrap items-center gap-2 mb-5 rounded-xl transition-colors ${
+          arrastrando ? 'ring-2 ring-forest bg-forest/5 p-3 -m-1' : ''
+        }`}
+      >
         {conCamara && (
           <>
             {/* Sin `capture`: así el selector ofrece cámara Y galería. Es
@@ -246,6 +306,11 @@ export default function ComprasPage() {
         <button onClick={() => setBorrador(borradorVacio())} className="btn-secondary">
           Capturar a mano
         </button>
+        {conCamara && (
+          <span className={`text-xs ${arrastrando ? 'text-forest font-medium' : 'text-stone-400'}`}>
+            {arrastrando ? 'Suelta la foto aquí' : 'o arrástrala aquí, o pégala con Ctrl+V'}
+          </span>
+        )}
       </div>
 
       {conCamara && (
