@@ -57,6 +57,8 @@ interface ModModal {
   descuentoAplicable: DescuentoView | null
   descuentoActivo: boolean
   cantidad: number
+  /** El modal se abre antes de tener los datos; esto dura ese parpadeo. */
+  cargando: boolean
 }
 
 const METODOS: MetodoPago[] = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA']
@@ -158,7 +160,6 @@ export default function POSPage() {
   const [savingTicket, setSavingTicket] = useState(false)
 
 
-  const [loadingMods, setLoadingMods] = useState<Set<number>>(new Set())
   const [modModal, setModModal] = useState<ModModal | null>(null)
   const [modError, setModError] = useState('')
 
@@ -356,18 +357,30 @@ export default function POSPage() {
       setError('Abre el turno en la pestaña "Turno" antes de vender.')
       return
     }
-    setLoadingMods((prev) => new Set(prev).add(producto.id))
+    // El modal se abre YA, antes de leer nada. Aunque los datos salgan de la
+    // copia local del dispositivo, esperarlos deja un hueco entre el toque y la
+    // respuesta que en una tablet se siente como que la caja no reacciona.
+    setModModal({
+      producto, grupos: [], seleccion: {},
+      descuentoAplicable: null, descuentoActivo: false, cantidad: 1,
+      cargando: true,
+    })
+    setModError('')
+
     try {
       const [grupos, descuentoAplicable] = await Promise.all([
         listarModificadoresProductoOffline(producto.id),
         getDescuentoAplicableOffline(producto.id).catch(() => null),
       ])
-      setModModal({ producto, grupos, seleccion: {}, descuentoAplicable, descuentoActivo: !!descuentoAplicable, cantidad: 1 })
-      setModError('')
+      // Si mientras tanto se cerró el modal o se tocó otro producto, esta
+      // respuesta ya no le corresponde a nadie.
+      setModModal((prev) => prev && prev.producto.id === producto.id
+        ? { ...prev, grupos, descuentoAplicable, descuentoActivo: !!descuentoAplicable, cargando: false }
+        : prev)
     } catch {
+      // Sin datos no hay opciones que elegir: se agrega tal cual, como antes.
+      setModModal((prev) => (prev && prev.producto.id === producto.id ? null : prev))
       addLine(producto, [], null, 1)
-    } finally {
-      setLoadingMods((prev) => { const s = new Set(prev); s.delete(producto.id); return s })
     }
   }
 
@@ -731,19 +744,18 @@ export default function POSPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {filteredProductos.map((p) => {
                 const cantEnCart = cart.filter((i) => i.productoId === p.id).reduce((s, i) => s + i.cantidad, 0)
-                const isLoadingMod = loadingMods.has(p.id)
                 return (
                   <button
                     key={p.id}
                     onClick={() => handleProductoClick(p)}
-                    disabled={isLoadingMod || !turno}
+                    disabled={!turno}
                     className={`card text-left p-4 hover:shadow-md hover:border-forest/30 transition-all active:scale-95 ${
                       cantEnCart > 0 ? 'ring-2 ring-forest/40 border-forest/20' : ''
-                    } ${isLoadingMod ? 'opacity-60 cursor-wait' : ''} ${!turno ? 'opacity-50 cursor-not-allowed active:scale-100' : ''}`}
+                    } ${!turno ? 'opacity-50 cursor-not-allowed active:scale-100' : ''}`}
                   >
-                    {isLoadingMod ? (
-                      <Spinner className="w-4 h-4 text-forest mb-2" />
-                    ) : cantEnCart > 0 ? (
+                    {/* Ya no hay spinner sobre la tarjeta: el modal abre al
+                        instante, así que la espera se ve dentro de él. */}
+                    {cantEnCart > 0 ? (
                       <span className="inline-flex items-center justify-center bg-forest text-cream text-xs font-bold w-5 h-5 rounded-full mb-2">
                         {cantEnCart}
                       </span>
@@ -1137,6 +1149,13 @@ export default function POSPage() {
 
             {modError && (
               <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{modError}</p>
+            )}
+
+            {modModal.cargando && (
+              <p className="text-sm text-stone-400 flex items-center gap-2">
+                <Spinner className="w-4 h-4 text-stone-400" />
+                Cargando opciones…
+              </p>
             )}
 
             {modModal.grupos.map((grupo) => {

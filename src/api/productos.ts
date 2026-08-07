@@ -40,12 +40,12 @@ export const listarModificadoresProducto = (id: number) =>
   api.get<ModificadorGrupo[]>(`/api/productos/${id}/modificadores`)
 
 /**
- * Responde con la copia local y refresca por detrás: se consulta en cada toque
- * de producto durante una venta, así que esperar a la red ahí se paga con el
- * cliente enfrente. La primera vez que se toca un producto sí espera.
+ * Sale de la copia local sin tocar la red: la precarga los baja todos al abrir
+ * la app y al abrir turno, y no cambian a media venta. Solo va al servidor si
+ * no hay copia — un producto creado después de la última precarga.
  */
 export const listarModificadoresProductoOffline = (id: number) =>
-  api.getCachedFirst<ModificadorGrupo[]>(`modificadores:${id}`, `/api/productos/${id}/modificadores`)
+  api.getCacheado<ModificadorGrupo[]>(`modificadores:${id}`, `/api/productos/${id}/modificadores`)
 
 export const asignarModificador = (productoId: number, grupoId: number) =>
   api.post<null>(`/api/productos/${productoId}/modificadores/${grupoId}`, {})
