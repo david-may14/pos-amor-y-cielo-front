@@ -221,13 +221,15 @@ export default function ComprasPage() {
       <div className="flex flex-wrap gap-2 mb-5">
         {conCamara && (
           <>
-            {/* Un input de archivo con `capture` abre la cámara dentro de la app
-                y en una computadora cae al selector de archivos. Sin plugin. */}
+            {/* Sin `capture`: así el selector ofrece cámara Y galería. Es
+                deliberado — el modo documento del propio teléfono recorta el
+                ticket y corrige la perspectiva, y un ticket recortado aprovecha
+                toda la resolución en la letra en vez de gastarla en la mesa.
+                Forzar la cámara directa impediría usar esa foto ya escaneada. */}
             <input
               ref={inputFoto}
               type="file"
               accept="image/*"
-              capture="environment"
               className="hidden"
               onChange={alElegirFoto}
             />
@@ -237,7 +239,7 @@ export default function ComprasPage() {
               className="btn-primary flex items-center gap-2"
             >
               {leyendo && <Spinner className="w-4 h-4 text-cream" />}
-              {leyendo ? 'Leyendo el ticket…' : 'Fotografiar ticket'}
+              {leyendo ? 'Leyendo el ticket…' : 'Capturar ticket'}
             </button>
           </>
         )}
@@ -245,6 +247,16 @@ export default function ComprasPage() {
           Capturar a mano
         </button>
       </div>
+
+      {conCamara && (
+        // Es el consejo que más cambia la precisión, y no cuesta nada: el
+        // recorte concentra toda la resolución en la letra del ticket en vez
+        // de gastarla en la mesa de alrededor.
+        <p className="text-xs text-stone-400 mb-5 -mt-2">
+          Se lee mejor si escaneas el ticket con el modo documento del teléfono y eliges esa foto:
+          recortado, la letra chica se aprovecha entera. Evita el blanco y negro puro — borra la tinta despintada.
+        </p>
+      )}
 
       <div className="card divide-y divide-stone-100">
         {compras.length === 0 ? (
