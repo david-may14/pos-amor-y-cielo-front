@@ -142,7 +142,9 @@ export default function UsuariosPage() {
                 <td className="px-5 py-3 text-stone-500">{u.email}</td>
                 <td className="px-5 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-md ${
-                    u.rol === 'ADMIN' ? 'bg-forest/10 text-forest font-medium' : 'bg-stone-100 text-stone-600'
+                    u.rol === 'ADMIN' ? 'bg-forest/10 text-forest font-medium'
+                      : u.rol === 'SUPERVISOR' ? 'bg-amber-50 text-amber-700 font-medium'
+                      : 'bg-stone-100 text-stone-600'
                   }`}>
                     {u.rol}
                   </span>
@@ -227,8 +229,9 @@ export default function UsuariosPage() {
                 value={form.rol}
                 onChange={(e) => setForm({ ...form, rol: e.target.value as Rol })}
               >
-                <option value="BARISTA">BARISTA</option>
-                <option value="ADMIN">ADMIN</option>
+                <option value="BARISTA">Barista — vende y abre turno</option>
+                <option value="SUPERVISOR">Supervisor — además anula ventas y registra mermas</option>
+                <option value="ADMIN">Admin — todo, incluidos costos y utilidad</option>
               </select>
             </div>
             <div className="flex gap-3 pt-2">

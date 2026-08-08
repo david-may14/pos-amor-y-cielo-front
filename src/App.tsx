@@ -39,6 +39,12 @@ function RequireAdmin() {
   return isAdmin ? <Outlet /> : <Navigate to="/pos" replace />
 }
 
+/** Rutas de operación del turno: supervisor y admin. */
+function RequireSupervisor() {
+  const { puedeSupervisar } = useAuth()
+  return puedeSupervisar ? <Outlet /> : <Navigate to="/pos" replace />
+}
+
 export default function App() {
   return (
     <Routes>
@@ -65,13 +71,16 @@ export default function App() {
           <Route path="/ventas" element={<VentasPage />} />
           <Route path="/caja" element={<CajaPage />} />
 
+          <Route element={<RequireSupervisor />}>
+            <Route path="/inventario" element={<InventarioPage />} />
+          </Route>
+
           <Route element={<RequireAdmin />}>
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/productos" element={<ProductosPage />} />
             <Route path="/insumos" element={<InsumosPage />} />
             <Route path="/ingredientes" element={<Navigate to="/insumos" replace />} />
             <Route path="/plantillas" element={<Navigate to="/insumos" replace />} />
-            <Route path="/inventario" element={<InventarioPage />} />
             <Route path="/usuarios" element={<UsuariosPage />} />
             <Route path="/modificadores" element={<ModificadoresPage />} />
             <Route path="/categorias" element={<CategoriasPage />} />

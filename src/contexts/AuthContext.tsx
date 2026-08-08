@@ -18,7 +18,10 @@ interface AuthUser {
 
 interface AuthContextValue {
   user: AuthUser | null
+  /** Estrictamente ADMIN. Es lo que protege costos, márgenes y utilidad. */
   isAdmin: boolean
+  /** ADMIN o SUPERVISOR: permisos de operación del turno, sin datos de negocio. */
+  puedeSupervisar: boolean
   /** Si este dispositivo tiene la sesión armada con PIN. null mientras se consulta IndexedDB. */
   hayPin: boolean | null
   /** Si el usuario ya definió un PIN en el servidor (lo dice el login). */
@@ -114,7 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, isAdmin: user?.rol === 'ADMIN', hayPin, usuarioTienePin,
+      user,
+      isAdmin: user?.rol === 'ADMIN',
+      puedeSupervisar: user?.rol === 'ADMIN' || user?.rol === 'SUPERVISOR',
+      hayPin, usuarioTienePin,
       login, logout, bloquear, desbloquear, crearPin, activarPin, quitarPin,
     }}>
       {children}

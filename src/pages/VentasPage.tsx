@@ -17,7 +17,9 @@ type DisplayItem =
   | { kind: 'sub'; venta: VentaResponse; idx: number; count: number; refId: number }
 
 export default function VentasPage() {
-  const { isAdmin } = useAuth()
+  // isAdmin sigue protegiendo costos, utilidad y propinas: un supervisor
+  // opera el turno pero no ve lo que gana el negocio.
+  const { isAdmin, puedeSupervisar } = useAuth()
   const [fecha, setFecha] = useState(hoy())
   const [ventas, setVentas] = useState<VentaResponse[]>([])
   const [resumen, setResumen] = useState<ResumenDia | null>(null)
@@ -95,7 +97,7 @@ export default function VentasPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-stone-800">Ventas</h1>
-        {isAdmin && (
+        {puedeSupervisar && (
           <div className="flex items-center gap-2">
             {/* Una bitacora que nadie puede leer no es un control. */}
             <button onClick={() => setVerBitacora(true)} className="btn-secondary text-sm">
@@ -281,7 +283,9 @@ export default function VentasPage() {
                             <button onClick={() => setDetalle(v)} className="text-xs text-forest hover:underline">
                               Ver detalle
                             </button>
-                            {!anulada && (
+                            {/* Antes se mostraba a cualquiera y el servidor lo
+                                rechazaba: un boton que siempre falla. */}
+                            {puedeSupervisar && !anulada && (
                               <button
                                 onClick={() => handleAnular(v)}
                                 disabled={anulando === v.id}
@@ -425,7 +429,7 @@ export default function VentasPage() {
             </div>
 
             {/* Acción anular */}
-            {detalle.estado !== 'ANULADA' && (
+            {puedeSupervisar && detalle.estado !== 'ANULADA' && (
               <button
                 onClick={() => handleAnular(detalle)}
                 disabled={anulando === detalle.id}

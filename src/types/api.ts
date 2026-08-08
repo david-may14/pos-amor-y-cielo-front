@@ -1,5 +1,5 @@
 // ─── Roles ────────────────────────────────────────────────────────────────────
-export type Rol = 'ADMIN' | 'BARISTA'
+export type Rol = 'ADMIN' | 'SUPERVISOR' | 'BARISTA'
 export type TipoAjuste = 'MERMA' | 'AJUSTE'
 export type MetodoPago = 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA'
 
