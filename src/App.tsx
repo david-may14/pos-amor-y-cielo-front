@@ -18,6 +18,7 @@ import TicketsPage from './pages/TicketsPage'
 import PlantillasPage from './pages/PlantillasPage'
 import InsumosPage from './pages/InsumosPage'
 import EquilibrioPage from './pages/EquilibrioPage'
+import ComprasPage from './pages/ComprasPage'
 import CosteoPage from './pages/CosteoPage'
 import CosteoReportePage from './pages/CosteoReportePage'
 import DesbloquearPage from './pages/DesbloquearPage'
@@ -77,6 +78,7 @@ export default function App() {
             <Route path="/descuentos" element={<DescuentosPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
             <Route path="/equilibrio" element={<EquilibrioPage />} />
+            <Route path="/compras" element={<ComprasPage />} />
             <Route path="/costeo" element={<CosteoPage />} />
           </Route>
         </Route>

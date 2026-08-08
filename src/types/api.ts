@@ -584,3 +584,77 @@ export interface EstadoCocina {
   pendientes: ComandaCocina[]
   entregadas: ComandaCocina[]
 }
+
+// ── Compras (control de gasto) ───────────────────────────────────────────────
+// Las líneas describen lo que decía el ticket y NO apuntan a ingredientes:
+// emparejar la descripción del proveedor con el catálogo propio es otro
+// problema, mucho más caro, y no hace falta para saber cuánto se gasta y en qué.
+
+export type CategoriaCompra = 'INSUMOS' | 'LIMPIEZA' | 'EMPAQUE' | 'MANTENIMIENTO' | 'OTROS'
+
+export const CATEGORIAS_COMPRA: CategoriaCompra[] =
+  ['INSUMOS', 'LIMPIEZA', 'EMPAQUE', 'MANTENIMIENTO', 'OTROS']
+
+export interface CompraLineaDTO {
+  id: number
+  descripcion: string
+  cantidad: number | null
+  precioUnitario: number | null
+  importe: number
+}
+
+export interface CompraDTO {
+  id: number
+  proveedor: string | null
+  fecha: string
+  total: number
+  categoria: CategoriaCompra
+  metodoPago: string | null
+  notas: string | null
+  fotoUrl: string | null
+  clientId: string | null
+  creadoEn: string
+  lineas: CompraLineaDTO[]
+  /** Si las líneas suman el total. Falso = la captura necesita revisión. */
+  cuadra: boolean
+}
+
+export interface CompraLineaRequest {
+  descripcion: string
+  cantidad?: number | null
+  precioUnitario?: number | null
+  importe: number
+}
+
+export interface CompraRequest {
+  proveedor?: string | null
+  fecha: string
+  total: number
+  categoria: CategoriaCompra
+  metodoPago?: string | null
+  notas?: string | null
+  clientId?: string
+  lineas: CompraLineaRequest[]
+}
+
+/** Lo que devuelve la lectura del ticket: una propuesta, no un registro. */
+export interface ExtraccionTicket {
+  proveedor: string | null
+  fecha: string | null
+  total: number | null
+  categoria: CategoriaCompra
+  lineas: {
+    descripcion: string
+    cantidad: number | null
+    precioUnitario: number | null
+    importe: number | null
+  }[]
+}
+
+export interface ResumenCompras {
+  desde: string
+  hasta: string
+  total: number
+  compras: number
+  porCategoria: Record<string, number>
+}
