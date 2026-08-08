@@ -405,7 +405,11 @@ export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
     setAnulandoId(c.id)
     setError('')
     try {
-      await anularVenta(venta.id)
+      // Deshacer un cobro recién hecho al dividir la cuenta es una corrección
+      // legítima, no una anulación deliberada: pedir motivo aquí sería
+      // insufrible y solo produciría ruido. Pero queda registrado igual — si
+      // pasara sin rastro, sería la puerta trasera de toda la bitácora.
+      await anularVenta(venta.id, 'CORRECCION_SPLIT')
       setPagadas(prev => {
         const next = { ...prev }
         delete next[c.id]
