@@ -658,3 +658,51 @@ export interface ResumenCompras {
   compras: number
   porCategoria: Record<string, number>
 }
+
+// ── Bitácora de anulaciones ──────────────────────────────────────────────────
+// Anular una venta mueve dinero. El motivo es obligatorio y sale de una lista
+// cerrada: la categoría es lo que deja ver patrones, porque el texto libre
+// solo no se puede agrupar.
+
+export type MotivoAnulacion =
+  | 'ERROR_COBRO'
+  | 'CLIENTE_CANCELO'
+  | 'PRODUCTO_MAL'
+  | 'PRUEBA'
+  | 'CORRECCION_SPLIT'
+  | 'OTRO'
+
+/**
+ * Los que se ofrecen al anular a mano. CORRECCION_SPLIT queda fuera a
+ * propósito: lo pone el POS solo al deshacer un cobro de una cuenta dividida.
+ */
+export const MOTIVOS_ANULACION: { valor: MotivoAnulacion; etiqueta: string }[] = [
+  { valor: 'ERROR_COBRO', etiqueta: 'Error al cobrar' },
+  { valor: 'CLIENTE_CANCELO', etiqueta: 'El cliente canceló' },
+  { valor: 'PRODUCTO_MAL', etiqueta: 'Producto mal o devuelto' },
+  { valor: 'PRUEBA', etiqueta: 'Prueba o capacitación' },
+  { valor: 'OTRO', etiqueta: 'Otro' },
+]
+
+export const ETIQUETA_MOTIVO: Record<MotivoAnulacion, string> = {
+  ERROR_COBRO: 'Error al cobrar',
+  CLIENTE_CANCELO: 'El cliente canceló',
+  PRODUCTO_MAL: 'Producto mal o devuelto',
+  PRUEBA: 'Prueba o capacitación',
+  CORRECCION_SPLIT: 'Corrección al dividir cuenta',
+  OTRO: 'Otro',
+}
+
+export interface AnulacionDTO {
+  id: number
+  ventaId: number
+  /** Quien anuló. */
+  anuladaPor: string | null
+  /** Quien había hecho la venta. */
+  vendedor: string | null
+  motivo: MotivoAnulacion
+  nota: string | null
+  totalAnulado: number
+  metodoPago: string | null
+  ocurridoEn: string
+}

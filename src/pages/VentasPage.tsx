@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { listarVentas, resumenDia, anularVenta } from '../api/ventas'
-import type { VentaResponse, ResumenDia } from '../types/api'
+import { listarVentas, resumenDia, anularVenta, listarAnulaciones } from '../api/ventas'
+import { MOTIVOS_ANULACION, ETIQUETA_MOTIVO } from '../types/api'
+import type { MotivoAnulacion, AnulacionDTO, VentaResponse, ResumenDia } from '../types/api'
 import { useAuth } from '../contexts/AuthContext'
 import Spinner from '../components/Spinner'
 import Modal from '../components/Modal'
@@ -24,6 +25,8 @@ export default function VentasPage() {
   const [error, setError] = useState('')
   const [detalle, setDetalle] = useState<VentaResponse | null>(null)
   const [anulando, setAnulando] = useState<number | null>(null)
+  const [porAnular, setPorAnular] = useState<VentaResponse | null>(null)
+  const [verBitacora, setVerBitacora] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -66,14 +69,20 @@ export default function VentasPage() {
     return items
   }, [ventas])
 
-  const handleAnular = async (v: VentaResponse) => {
-    if (!confirm(`¿Anular la venta #${v.id} por ${fmt(v.total)}? Se restaurará el inventario.`)) return
+  // Ya no basta con un confirm(): anular exige motivo, y ese motivo es lo que
+  // convierte la operacion en algo auditable.
+  const handleAnular = (v: VentaResponse) => setPorAnular(v)
+
+  const confirmarAnulacion = async (motivo: MotivoAnulacion, nota: string) => {
+    const v = porAnular
+    if (!v) return
     setAnulando(v.id)
     setError('')
     try {
-      const actualizada = await anularVenta(v.id)
+      const actualizada = await anularVenta(v.id, motivo, nota.trim() || undefined)
       setVentas((prev) => prev.map((x) => x.id === v.id ? actualizada : x))
       if (detalle?.id === v.id) setDetalle(actualizada)
+      setPorAnular(null)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al anular')
     } finally {
@@ -87,12 +96,18 @@ export default function VentasPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-stone-800">Ventas</h1>
         {isAdmin && (
-          <input
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="input w-auto text-sm"
-          />
+          <div className="flex items-center gap-2">
+            {/* Una bitacora que nadie puede leer no es un control. */}
+            <button onClick={() => setVerBitacora(true)} className="btn-secondary text-sm">
+              Anulaciones
+            </button>
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              className="input w-auto text-sm"
+            />
+          </div>
         )}
       </div>
 
@@ -422,7 +437,157 @@ export default function VentasPage() {
           </div>
         </Modal>
       )}
+
+      {porAnular && (
+        <ModalAnular
+          venta={porAnular}
+          anulando={anulando === porAnular.id}
+          onConfirmar={confirmarAnulacion}
+          onCerrar={() => setPorAnular(null)}
+        />
+      )}
+
+      {verBitacora && <PanelBitacora fecha={fecha} onCerrar={() => setVerBitacora(false)} />}
     </div>
+  )
+}
+
+interface ModalAnularProps {
+  venta: VentaResponse
+  anulando: boolean
+  onConfirmar: (motivo: MotivoAnulacion, nota: string) => void
+  onCerrar: () => void
+}
+
+/**
+ * Pide el motivo antes de anular.
+ *
+ * Sustituye al confirm() del navegador a proposito: la friccion es la funcion.
+ * Anular deshace un cobro y devuelve inventario, y quien lo hace queda
+ * registrado con nombre y motivo.
+ */
+function ModalAnular({ venta, anulando, onConfirmar, onCerrar }: ModalAnularProps) {
+  const [motivo, setMotivo] = useState<MotivoAnulacion | ''>('')
+  const [nota, setNota] = useState('')
+
+  // "Otro" sin explicacion no informa de nada, que es justo lo que la bitacora
+  // existe para evitar. El resto de motivos ya se explican con su categoria.
+  const faltaExplicacion = motivo === 'OTRO' && !nota.trim()
+  const puedeAnular = motivo !== '' && !faltaExplicacion && !anulando
+
+  return (
+    <Modal title={`Anular venta #${venta.id}`} onClose={onCerrar} size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-stone-600">
+          Se devolverá <span className="font-semibold">{fmt(venta.total)}</span> y se restaurará
+          el inventario. Queda registrado quién anula y por qué.
+        </p>
+
+        <div>
+          <label className="label">Motivo</label>
+          <select
+            className="input"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value as MotivoAnulacion)}
+            autoFocus
+          >
+            <option value="">Elige un motivo…</option>
+            {MOTIVOS_ANULACION.map((m) => (
+              <option key={m.valor} value={m.valor}>{m.etiqueta}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="label">
+            Detalle {motivo === 'OTRO' ? '' : <span className="text-stone-400">(opcional)</span>}
+          </label>
+          <input
+            className="input"
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            placeholder={motivo === 'OTRO' ? 'Explica qué pasó' : 'Añade contexto si hace falta'}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onCerrar} className="btn-secondary">Cancelar</button>
+          <button
+            onClick={() => motivo && onConfirmar(motivo, nota)}
+            disabled={!puedeAnular}
+            className="btn-danger disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {anulando ? 'Anulando…' : 'Anular venta'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+/** La bitácora del mes en curso hasta la fecha seleccionada. */
+function PanelBitacora({ fecha, onCerrar }: { fecha: string; onCerrar: () => void }) {
+  const [registros, setRegistros] = useState<AnulacionDTO[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const desde = fecha.slice(0, 8) + '01'
+    listarAnulaciones(desde, fecha)
+      .then(setRegistros)
+      .catch(() => setError('No se pudo cargar la bitácora'))
+      .finally(() => setCargando(false))
+  }, [fecha])
+
+  const total = registros.reduce((s, r) => s + r.totalAnulado, 0)
+
+  return (
+    <Modal title="Anulaciones del mes" onClose={onCerrar} size="lg">
+      {cargando ? (
+        <div className="flex justify-center py-8"><Spinner className="w-6 h-6 text-forest" /></div>
+      ) : error ? (
+        <p className="text-sm text-red-600">{error}</p>
+      ) : registros.length === 0 ? (
+        <p className="text-sm text-stone-400 py-6 text-center">
+          Sin anulaciones registradas este mes.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm text-stone-500">{registros.length} anulaciones</p>
+            <p className="text-sm">
+              <span className="text-stone-500">Total anulado </span>
+              <span className="font-semibold text-stone-800">{fmt(total)}</span>
+            </p>
+          </div>
+
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+            {registros.map((r) => (
+              <div key={r.id} className="border border-stone-100 rounded-lg px-3 py-2">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-medium text-stone-800">
+                    {ETIQUETA_MOTIVO[r.motivo]}
+                  </span>
+                  <span className="text-sm font-semibold text-stone-700">{fmt(r.totalAnulado)}</span>
+                </div>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Venta #{r.ventaId} · {new Date(r.ocurridoEn).toLocaleString('es-MX', {
+                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+                  })}
+                  {r.anuladaPor && <> · anuló <span className="text-stone-600">{r.anuladaPor}</span></>}
+                  {r.vendedor && <> · vendió <span className="text-stone-600">{r.vendedor}</span></>}
+                </p>
+                {r.nota && <p className="text-xs text-stone-600 mt-1 italic">{r.nota}</p>}
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-stone-400">
+            Las ventas anuladas antes de que existiera esta bitácora no aparecen aquí.
+          </p>
+        </div>
+      )}
+    </Modal>
   )
 }
 

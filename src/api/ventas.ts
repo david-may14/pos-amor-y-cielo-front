@@ -1,5 +1,8 @@
 import { api } from './client'
-import type { VentaResponse, ResumenDia, ResumenPeriodo, ItemRequest } from '../types/api'
+import type {
+  VentaResponse, ResumenDia, ResumenPeriodo, ItemRequest,
+  MotivoAnulacion, AnulacionDTO,
+} from '../types/api'
 
 export const reportePeriodo = (desde: string, hasta: string) =>
   api.get<ResumenPeriodo>(`/api/ventas/reporte?desde=${desde}&hasta=${hasta}`)
@@ -13,8 +16,16 @@ export const detalleVenta = (id: number) =>
 export const resumenDia = (fecha?: string) =>
   api.get<ResumenDia>(`/api/ventas/resumen${fecha ? `?fecha=${fecha}` : ''}`)
 
-export const anularVenta = (id: number) =>
-  api.post<VentaResponse>(`/api/ventas/${id}/anular`, {})
+/**
+ * Anula una venta. El motivo es obligatorio desde que existe la bitácora:
+ * anular mueve dinero, y sin registro la operación es indistinguible de
+ * quedarse con el efectivo de una venta que "nunca ocurrió".
+ */
+export const anularVenta = (id: number, motivo: MotivoAnulacion, nota?: string) =>
+  api.post<VentaResponse>(`/api/ventas/${id}/anular`, { motivo, nota: nota ?? null })
+
+export const listarAnulaciones = (desde: string, hasta: string) =>
+  api.get<AnulacionDTO[]>(`/api/ventas/anulaciones?desde=${desde}&hasta=${hasta}`)
 
 export const crearVenta = (
   items: ItemRequest[],
