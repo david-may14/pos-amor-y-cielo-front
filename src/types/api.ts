@@ -168,12 +168,19 @@ export interface RecetaLineaRequest {
 }
 
 // ─── Ingredientes ─────────────────────────────────────────────────────────────
-export interface Ingrediente {
+/**
+ * Lo que hace falta para registrar una merma. Sin costos: es lo que ve un
+ * supervisor, y su rol existe justamente para no mostrarlos.
+ */
+export interface IngredienteBasico {
   id: number
   nombre: string
   unidad: string
   stockActual: number
   stockMinimo: number
+}
+
+export interface Ingrediente extends IngredienteBasico {
   costoUnitario: number
   margenSeguridad: number | null
   rendimientoLote: number | null

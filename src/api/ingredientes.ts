@@ -1,5 +1,9 @@
 import { api, descargarArchivo, subirArchivo } from './client'
-import type { Ingrediente, IngredienteRequest, AlertaStockDTO, SubrecetaDTO, SubrecetaRequest, IngredientePrecioDTO, AgregarPrecioRequest, IngPreviewResult, IngImportResult } from '../types/api'
+import type { Ingrediente, IngredienteBasico, IngredienteRequest, AlertaStockDTO, SubrecetaDTO, SubrecetaRequest, IngredientePrecioDTO, AgregarPrecioRequest, IngPreviewResult, IngImportResult } from '../types/api'
+
+/** Listado sin costos, para quien no es admin. */
+export const listarIngredientesBasico = () =>
+  api.get<IngredienteBasico[]>('/api/ingredientes/basico')
 
 export const listarIngredientes = () => api.get<Ingrediente[]>('/api/ingredientes')
 
