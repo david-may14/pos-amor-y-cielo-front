@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { listarMovimientos, registrarCompra, registrarAjuste } from '../api/inventario'
-import { listarIngredientes, obtenerSubreceta, producirIngrediente } from '../api/ingredientes'
-import type { MovimientoInventario, Ingrediente, TipoAjuste, SubrecetaDTO } from '../types/api'
+import { listarIngredientes, listarIngredientesBasico, obtenerSubreceta, producirIngrediente } from '../api/ingredientes'
+import { useAuth } from '../contexts/AuthContext'
+import type { MovimientoInventario, Ingrediente, IngredienteBasico, TipoAjuste, SubrecetaDTO } from '../types/api'
 import Spinner from '../components/Spinner'
 import Toast from '../components/Toast'
 
@@ -14,8 +15,10 @@ interface LineaCompra {
 }
 
 export default function InventarioPage() {
+  // El supervisor entra a registrar mermas; compras y produccion son del admin.
+  const { isAdmin } = useAuth()
   const [tab, setTab] = useState<Tab>('stock')
-  const [ingredientes, setIngredientes] = useState<Ingrediente[]>([])
+  const [ingredientes, setIngredientes] = useState<IngredienteBasico[]>([])
   const [movimientos, setMovimientos] = useState<MovimientoInventario[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,7 +43,10 @@ export default function InventarioPage() {
   const cargar = useCallback(async () => {
     setLoading(true)
     try {
-      const [ings, movs] = await Promise.all([listarIngredientes(), listarMovimientos()])
+      const [ings, movs] = await Promise.all([
+        isAdmin ? listarIngredientes() : listarIngredientesBasico(),
+        listarMovimientos(),
+      ])
       setIngredientes(ings)
       setMovimientos(movs)
     } catch (e: unknown) {
@@ -124,7 +130,7 @@ export default function InventarioPage() {
     setToastMsg('')
     try {
       await producirIngrediente(parseInt(prodIngId), lotes)
-      const ings = await listarIngredientes()
+      const ings = isAdmin ? await listarIngredientes() : await listarIngredientesBasico()
       setIngredientes(ings)
       setProdIngId('')
       setProdLotes('1')
@@ -160,7 +166,12 @@ export default function InventarioPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-surface-muted rounded-xl p-1 w-full sm:w-fit mb-6 overflow-x-auto">
-        {([['stock', 'Stock'], ['compras', 'Compras'], ['ajustes', 'Ajustes'], ['produccion', 'Producción'], ['historial', 'Historial']] as [Tab, string][]).map(([t, label]) => (
+        {/* Un supervisor no ve Compras ni Producción: exponen costos y recetas.
+            Mostrarlas para que el servidor las rechace serían pestañas que
+            siempre fallan. */}
+        {(([['stock', 'Stock'], ['compras', 'Compras'], ['ajustes', 'Ajustes'], ['produccion', 'Producción'], ['historial', 'Historial']] as [Tab, string][])
+          .filter(([t]) => isAdmin || (t !== 'compras' && t !== 'produccion'))
+        ).map(([t, label]) => (
           <button
             key={t}
             onClick={() => { setTab(t); setError(''); setToastMsg('') }}
@@ -206,7 +217,7 @@ export default function InventarioPage() {
                 <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Ingrediente</th>
                 <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Stock actual</th>
                 <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Stock mín.</th>
-                <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Costo unitario</th>
+                {isAdmin && <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Costo unitario</th>}
                 <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Estado</th>
               </tr>
             </thead>
@@ -245,9 +256,11 @@ export default function InventarioPage() {
                         {ing.stockActual} {ing.unidad}
                       </td>
                       <td className="px-5 py-3 text-right text-stone-400">{ing.stockMinimo} {ing.unidad}</td>
-                      <td className="px-5 py-3 text-right text-stone-500">
-                        ${ing.costoUnitario}/{ing.unidad}
-                      </td>
+                      {isAdmin && (
+                        <td className="px-5 py-3 text-right text-stone-500">
+                          ${(ing as Ingrediente).costoUnitario}/{ing.unidad}
+                        </td>
+                      )}
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-20 h-1.5 bg-stone-100 rounded-full overflow-hidden">
@@ -419,11 +432,11 @@ export default function InventarioPage() {
                 onChange={(e) => handleSeleccionarElaborado(e.target.value)}
               >
                 <option value="">Seleccionar…</option>
-                {ingredientes.filter(i => i.rendimientoLote != null).map(i => (
+                {(ingredientes as Ingrediente[]).filter(i => i.rendimientoLote != null).map(i => (
                   <option key={i.id} value={i.id}>{i.nombre} ({i.stockActual} {i.unidad})</option>
                 ))}
               </select>
-              {ingredientes.filter(i => i.rendimientoLote != null).length === 0 && (
+              {(ingredientes as Ingrediente[]).filter(i => i.rendimientoLote != null).length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">
                   Ningún ingrediente tiene sub-receta. Define una en la pantalla de Ingredientes.
                 </p>
