@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.amorycielo.pos",
+      "sha256_cert_fingerprints": [
+        "C2:7B:DB:4F:53:55:C2:CA:B3:99:2F:D5:CA:36:8B:D8:42:DD:F8:54:9E:2E:29:39:0C:60:78:F8:39:1E:D7:00"
+      ]
+    }
+  }
+]
