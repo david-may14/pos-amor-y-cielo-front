@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { hoy, primerDiaDelMes } from '../utils/fecha'
 import {
   listarCompras, resumenCompras, crearCompra, eliminarCompra,
   extraccionDisponible, extraerTicket,
@@ -23,8 +24,7 @@ import Spinner from '../components/Spinner'
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
-const hoyISO = () => new Date().toISOString().slice(0, 10)
-const primerDiaDelMes = () => hoyISO().slice(0, 8) + '01'
+
 
 /** Borrador editable de la pantalla de revisión. */
 interface Borrador {
@@ -39,7 +39,7 @@ interface Borrador {
 }
 
 const borradorVacio = (): Borrador => ({
-  proveedor: '', fecha: hoyISO(), total: '', categoria: 'INSUMOS',
+  proveedor: '', fecha: hoy(), total: '', categoria: 'INSUMOS',
   notas: '', lineas: [], vistaPrevia: null,
 })
 
@@ -47,7 +47,7 @@ export default function ComprasPage() {
   const [compras, setCompras] = useState<CompraDTO[]>([])
   const [resumen, setResumen] = useState<ResumenCompras | null>(null)
   const [desde, setDesde] = useState(primerDiaDelMes())
-  const [hasta, setHasta] = useState(hoyISO())
+  const [hasta, setHasta] = useState(hoy())
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
 
@@ -154,7 +154,7 @@ export default function ComprasPage() {
 
       setBorrador({
         proveedor: propuesta.proveedor ?? '',
-        fecha: propuesta.fecha ?? hoyISO(),
+        fecha: propuesta.fecha ?? hoy(),
         total: propuesta.total != null ? String(propuesta.total) : '',
         categoria: propuesta.categoria ?? 'INSUMOS',
         notas: '',

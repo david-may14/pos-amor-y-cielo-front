@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { hoy } from '../utils/fecha'
 import { useNavigate } from 'react-router-dom'
 import { historialTickets } from '../api/tickets'
 import { cancelarTicketLocal, sincronizarTickets, useTicketsAbiertos } from '../db/offlineTickets'
@@ -14,7 +15,7 @@ const fmt = (n: number) =>
 const fmtHora = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
 
-const hoy = () => new Date().toISOString().slice(0, 10)
+
 
 type Vista = 'abiertas' | 'historial'
 

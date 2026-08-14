@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { hoy } from '../utils/fecha'
 import { abrirTurno, cerrarTurno, listarTurnos, registrarMovimiento } from '../api/turnos'
 import { cerrarMes, listarCierresMensuales, previsualizarCierreMensual } from '../api/cierresMensuales'
 import type { TurnoDTO, CierreMensualDTO } from '../types/api'
@@ -21,7 +22,7 @@ const fmtHora = (s: string) =>
 const fmtFecha = (s: string) =>
   new Date(s).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
 
-const hoy = () => new Date().toISOString().split('T')[0]
+
 
 export default function CajaPage() {
   const { isAdmin } = useAuth()

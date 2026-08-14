@@ -7,14 +7,27 @@ import type {
 export const reportePeriodo = (desde: string, hasta: string) =>
   api.get<ResumenPeriodo>(`/api/ventas/reporte?desde=${desde}&hasta=${hasta}`)
 
-export const listarVentas = (fecha?: string) =>
-  api.get<VentaResponse[]>(`/api/ventas${fecha ? `?fecha=${fecha}` : ''}`)
+/**
+ * Ventas de un rango de fechas, en la zona del negocio.
+ *
+ * Los días se cuentan en Mérida y no en UTC: la cafetería abre por la tarde y
+ * las 18:00 de aquí son las 00:00 UTC, así que contando en UTC cada servicio
+ * quedaba partido entre dos fechas.
+ */
+export const listarVentas = (desde?: string, hasta?: string) => {
+  const q = desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''
+  return api.get<VentaResponse[]>(`/api/ventas${q}`)
+}
 
 export const detalleVenta = (id: number) =>
   api.get<VentaResponse>(`/api/ventas/${id}`)
 
-export const resumenDia = (fecha?: string) =>
-  api.get<ResumenDia>(`/api/ventas/resumen${fecha ? `?fecha=${fecha}` : ''}`)
+/** El mismo resumen, sobre el rango. Las cuentas las hace el servidor: si se
+ *  rehicieran aquí, dejarían de coincidir el día que cambie la fórmula. */
+export const resumenDia = (desde?: string, hasta?: string) => {
+  const q = desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''
+  return api.get<ResumenDia>(`/api/ventas/resumen${q}`)
+}
 
 /**
  * Anula una venta. El motivo es obligatorio desde que existe la bitácora:
