@@ -4,23 +4,37 @@ import { MOTIVOS_ANULACION, ETIQUETA_MOTIVO } from '../types/api'
 import type { MotivoAnulacion, AnulacionDTO, VentaResponse, ResumenDia } from '../types/api'
 import { useAuth } from '../contexts/AuthContext'
 import Spinner from '../components/Spinner'
+import { hoy, diasAtras } from '../utils/fecha'
 import Modal from '../components/Modal'
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
-const hoy = () => new Date().toISOString().split('T')[0]
+
 
 type DisplayItem =
   | { kind: 'solo'; venta: VentaResponse }
   | { kind: 'group-header'; grupo: string; miembros: VentaResponse[]; refId: number }
   | { kind: 'sub'; venta: VentaResponse; idx: number; count: number; refId: number }
 
+/**
+ * Rangos de uso diario. Se calculan al pulsar, no al cargar: la pantalla se
+ * queda abierta toda la tarde, y con "hoy" congelado al abrirla dejaría de
+ * apuntar al día correcto pasada la medianoche.
+ */
+const ATAJOS: { etiqueta: string; rango: () => [string, string] }[] = [
+  { etiqueta: 'Hoy', rango: () => [hoy(), hoy()] },
+  { etiqueta: 'Ayer', rango: () => { const a = diasAtras(1); return [a, a] } },
+  { etiqueta: 'Últimos 7 días', rango: () => [diasAtras(6), hoy()] },
+  { etiqueta: 'Este mes', rango: () => [hoy().slice(0, 8) + '01', hoy()] },
+]
+
 export default function VentasPage() {
   // isAdmin sigue protegiendo costos, utilidad y propinas: un supervisor
   // opera el turno pero no ve lo que gana el negocio.
   const { isAdmin, puedeSupervisar } = useAuth()
-  const [fecha, setFecha] = useState(hoy())
+  const [desde, setDesde] = useState(hoy())
+  const [hasta, setHasta] = useState(hoy())
   const [ventas, setVentas] = useState<VentaResponse[]>([])
   const [resumen, setResumen] = useState<ResumenDia | null>(null)
   const [loading, setLoading] = useState(true)
@@ -34,7 +48,7 @@ export default function VentasPage() {
     setLoading(true)
     setError('')
     try {
-      const [v, r] = await Promise.all([listarVentas(fecha), resumenDia(fecha)])
+      const [v, r] = await Promise.all([listarVentas(desde, hasta), resumenDia(desde, hasta)])
       setVentas(v)
       setResumen(r)
     } catch (e: unknown) {
@@ -42,7 +56,7 @@ export default function VentasPage() {
     } finally {
       setLoading(false)
     }
-  }, [fecha])
+  }, [desde, hasta])
 
   useEffect(() => { cargar() }, [cargar])
 
@@ -95,7 +109,7 @@ export default function VentasPage() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-xl font-semibold text-stone-800">Ventas</h1>
         {puedeSupervisar && (
           <div className="flex items-center gap-2">
@@ -103,15 +117,52 @@ export default function VentasPage() {
             <button onClick={() => setVerBitacora(true)} className="btn-secondary text-sm">
               Anulaciones
             </button>
-            <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              className="input w-auto text-sm"
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={desde}
+                max={hasta}
+                onChange={(e) => setDesde(e.target.value)}
+                className="input w-auto text-sm"
+                aria-label="Desde"
+              />
+              <span className="text-stone-400 text-sm">a</span>
+              <input
+                type="date"
+                value={hasta}
+                min={desde}
+                onChange={(e) => setHasta(e.target.value)}
+                className="input w-auto text-sm"
+                aria-label="Hasta"
+              />
+            </div>
           </div>
         )}
       </div>
+
+      {/* Atajos: teclear dos fechas para ver "la semana" es justo la fricción
+          que hace que nadie mire más allá de hoy. */}
+      {puedeSupervisar && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {ATAJOS.map((a) => {
+            const [d, h] = a.rango()
+            const activo = d === desde && h === hasta
+            return (
+              <button
+                key={a.etiqueta}
+                onClick={() => { setDesde(d); setHasta(h) }}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                  activo
+                    ? 'bg-forest text-white border-forest'
+                    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'
+                }`}
+              >
+                {a.etiqueta}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 mb-5">{error}</div>
@@ -213,7 +264,9 @@ export default function VentasPage() {
           {/* Tabla de ventas */}
           {ventas.length === 0 ? (
             <div className="card px-6 py-16 text-center text-stone-400 text-sm">
-              No hay ventas registradas para esta fecha.
+              {desde === hasta
+                ? 'No hay ventas registradas para esta fecha.'
+                : 'No hay ventas registradas en este periodo.'}
             </div>
           ) : (
             <div className="card overflow-x-auto">
@@ -451,7 +504,7 @@ export default function VentasPage() {
         />
       )}
 
-      {verBitacora && <PanelBitacora fecha={fecha} onCerrar={() => setVerBitacora(false)} />}
+      {verBitacora && <PanelBitacora fecha={hasta} onCerrar={() => setVerBitacora(false)} />}
     </div>
   )
 }

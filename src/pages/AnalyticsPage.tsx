@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { hoy } from '../utils/fecha'
 import { reportePeriodo } from '../api/ventas'
 import type { ResumenPeriodo, ResumenDia } from '../types/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -9,7 +10,7 @@ const fmt = (n: number) =>
 
 type Rango = 'hoy' | 'semana' | 'mes' | 'anio' | 'custom'
 
-function hoy() { return new Date().toISOString().split('T')[0] }
+
 
 function rangoFechas(r: Rango): { desde: string; hasta: string } {
   const now = new Date()
