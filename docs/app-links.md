@@ -1,4 +1,12 @@
-# assetlinks.json — por qué está aquí
+# App Links — cómo abre la app en vez del navegador
+
+El archivo vive en `assets/.well-known/assetlinks.json`.
+
+**Ojo con la carpeta**: la de este proyecto es `assets/`, no `public/` —
+está así en `vite.config.js` (`publicDir: 'assets'`). Un archivo puesto en
+`public/` no llega al despliegue, y el fallo es silencioso: Vercel devuelve el
+`index.html` de la aplicación y Android descarta la verificación sin decir
+nada.
 
 Este archivo es lo que hace que un enlace `https://pos.amorycielo.com/...`
 —en un correo, en WhatsApp, donde sea— **abra la app en vez del navegador**
