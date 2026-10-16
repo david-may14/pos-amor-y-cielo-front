@@ -1,6 +1,8 @@
 // ─── Roles ────────────────────────────────────────────────────────────────────
 export type Rol = 'ADMIN' | 'SUPERVISOR' | 'BARISTA'
 export type TipoAjuste = 'MERMA' | 'AJUSTE'
+/** DELTA suma o resta lo que mandes; FIJAR deja el stock exactamente en `cantidad`. */
+export type ModoAjuste = 'DELTA' | 'FIJAR'
 export type MetodoPago = 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -279,6 +281,8 @@ export interface AjusteRequest {
   ingredienteId: number
   cantidad: number
   tipo: TipoAjuste
+  /** Omitirlo equivale a DELTA, el comportamiento historico del endpoint. */
+  modo?: ModoAjuste
   nota?: string
 }
 
