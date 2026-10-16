@@ -2,11 +2,65 @@ import { useState, useEffect, useCallback } from 'react'
 import { listarMovimientos, registrarCompra, registrarAjuste } from '../api/inventario'
 import { listarIngredientes, listarIngredientesBasico, obtenerSubreceta, producirIngrediente } from '../api/ingredientes'
 import { useAuth } from '../contexts/AuthContext'
-import type { MovimientoInventario, Ingrediente, IngredienteBasico, TipoAjuste, SubrecetaDTO } from '../types/api'
+import type { MovimientoInventario, Ingrediente, IngredienteBasico, TipoAjuste, ModoAjuste, SubrecetaDTO } from '../types/api'
 import Spinner from '../components/Spinner'
 import Toast from '../components/Toast'
+import SearchableSelect from '../components/SearchableSelect'
 
 type Tab = 'stock' | 'compras' | 'ajustes' | 'produccion' | 'historial'
+
+/**
+ * Lo que el usuario quiere hacer, en sus palabras. `tipo` y `modo` del API se
+ * derivan de aqui: la pantalla ya no pide traducir "merma" a un numero negativo
+ * ni calcular a mano el delta para dejar un ingrediente en un valor exacto.
+ */
+type Operacion = 'MERMA' | 'SUMAR_RESTAR' | 'FIJAR'
+
+/**
+ * Como se lee cada tipo de movimiento en el historial.
+ *
+ * Los tipos de produccion existen aparte porque antes se guardaban como MERMA
+ * y COMPRA: el consumo de insumos al producir aparecia como desperdicio y el
+ * lote producido como compra a proveedor. Con eso no se podia contestar cuanto
+ * se echo a perder ni cuanto se le compro a quien.
+ */
+const MOVIMIENTOS: Record<string, { etiqueta: string; clase: string }> = {
+  COMPRA:             { etiqueta: 'Compra',            clase: 'bg-green-50 text-green-700' },
+  VENTA:              { etiqueta: 'Venta',             clase: 'bg-blue-50 text-blue-700' },
+  MERMA:              { etiqueta: 'Merma',             clase: 'bg-red-50 text-red-700' },
+  AJUSTE:             { etiqueta: 'Ajuste',            clase: 'bg-amber-50 text-amber-700' },
+  ANULACION:          { etiqueta: 'Anulación',         clase: 'bg-stone-100 text-stone-600' },
+  PRODUCCION_CONSUMO: { etiqueta: 'Producción · usó',  clase: 'bg-indigo-50 text-indigo-700' },
+  PRODUCCION_SALIDA:  { etiqueta: 'Producción · hizo', clase: 'bg-teal-50 text-teal-700' },
+}
+
+const OPERACIONES: Record<Operacion, {
+  etiqueta: string
+  ayuda: string
+  tipo: TipoAjuste
+  modo: ModoAjuste
+  etiquetaCantidad: string
+  permiteNegativo: boolean
+}> = {
+  MERMA: {
+    etiqueta: 'Merma — se echó a perder',
+    ayuda: 'Descuenta del stock lo que se tiró, se derramó o caducó. Queda registrado como pérdida.',
+    tipo: 'MERMA', modo: 'DELTA',
+    etiquetaCantidad: 'Cantidad perdida', permiteNegativo: false,
+  },
+  SUMAR_RESTAR: {
+    etiqueta: 'Corregir — sumar o restar',
+    ayuda: 'Corrige un error de captura sumando o restando. Usa negativo para restar.',
+    tipo: 'AJUSTE', modo: 'DELTA',
+    etiquetaCantidad: 'Cantidad (+/−)', permiteNegativo: true,
+  },
+  FIJAR: {
+    etiqueta: 'Corregir — dejar el stock en',
+    ayuda: 'Pone el stock en el valor exacto que cuentes en físico. El sistema calcula la diferencia.',
+    tipo: 'AJUSTE', modo: 'FIJAR',
+    etiquetaCantidad: 'Stock real contado', permiteNegativo: false,
+  },
+}
 
 interface LineaCompra {
   ingredienteId: string
@@ -30,7 +84,7 @@ export default function InventarioPage() {
   const [savingCompra, setSavingCompra] = useState(false)
 
   // Ajustes form
-  const [ajuste, setAjuste] = useState({ ingredienteId: '', cantidad: '', tipo: 'AJUSTE' as TipoAjuste, nota: '' })
+  const [ajuste, setAjuste] = useState({ ingredienteId: '', cantidad: '', operacion: 'MERMA' as Operacion, nota: '' })
   const [savingAjuste, setSavingAjuste] = useState(false)
 
   // Producción form
@@ -93,14 +147,16 @@ export default function InventarioPage() {
     setError('')
     setToastMsg('')
     try {
+      const op = OPERACIONES[ajuste.operacion]
       await registrarAjuste({
         ingredienteId: parseInt(ajuste.ingredienteId),
         cantidad: parseFloat(ajuste.cantidad),
-        tipo: ajuste.tipo,
+        tipo: op.tipo,
+        modo: op.modo,
         ...(ajuste.nota ? { nota: ajuste.nota } : {}),
       })
-      setAjuste({ ingredienteId: '', cantidad: '', tipo: 'AJUSTE', nota: '' })
-      setToastMsg('Ajuste registrado correctamente')
+      setAjuste({ ingredienteId: '', cantidad: '', operacion: ajuste.operacion, nota: '' })
+      setToastMsg(ajuste.operacion === 'MERMA' ? 'Merma registrada' : 'Ajuste registrado')
       await recargarMovimientos()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al registrar ajuste')
@@ -151,6 +207,31 @@ export default function InventarioPage() {
 
   const nombreIngrediente = (id: number) =>
     ingredientes.find((i) => i.id === id)?.nombre ?? `#${id}`
+
+  /**
+   * Antes/despues del ajuste, calculado con la misma regla que aplica el
+   * backend. Es la pieza que vuelve obvio lo que antes habia que adivinar:
+   * que una merma baja el stock, y en cuanto queda al fijar un valor.
+   */
+  const vistaPreviaAjuste = (() => {
+    const ing = ingredientes.find((i) => i.id === parseInt(ajuste.ingredienteId))
+    const cantidad = parseFloat(ajuste.cantidad)
+    if (!ing || Number.isNaN(cantidad)) return null
+
+    const { tipo, modo } = OPERACIONES[ajuste.operacion]
+    const delta =
+      tipo === 'MERMA' ? -Math.abs(cantidad)
+      : modo === 'FIJAR' ? cantidad - ing.stockActual
+      : cantidad
+
+    const redondear = (v: number) => parseFloat(v.toFixed(3))
+    return {
+      nombre: ing.nombre,
+      unidad: ing.unidad,
+      antes: redondear(ing.stockActual),
+      despues: redondear(ing.stockActual + delta),
+    }
+  })()
 
   if (loading) {
     return (
@@ -287,25 +368,22 @@ export default function InventarioPage() {
       {tab === 'compras' && (
         <div className="card p-6 max-w-2xl">
           <p className="text-sm text-stone-500 mb-5">
-            Registra una entrada de ingredientes. El stock se actualiza automáticamente.
+            Entrada de ingredientes que <strong>le compraste a un proveedor</strong>. Suma al stock.
+            Si lo produjiste tú, usa la pestaña Producción.
           </p>
           <div className="space-y-3">
             {lineas.map((linea, i) => (
               <div key={i} className="flex flex-col sm:flex-row gap-2 sm:items-end border-b border-stone-100 pb-3 sm:border-0 sm:pb-0">
                 <div className="flex-1">
                   {i === 0 && <label className="label">Ingrediente</label>}
-                  <select
-                    className="input"
+                  <SearchableSelect
+                    options={ingredientes.map((ing) => ({
+                      value: String(ing.id),
+                      label: `${ing.nombre} (${ing.unidad})`,
+                    }))}
                     value={linea.ingredienteId}
-                    onChange={(e) => updateLinea(i, 'ingredienteId', e.target.value)}
-                  >
-                    <option value="">Seleccionar…</option>
-                    {ingredientes.map((ing) => (
-                      <option key={ing.id} value={ing.id}>
-                        {ing.nombre} ({ing.unidad})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => updateLinea(i, 'ingredienteId', v)}
+                  />
                 </div>
                 <div className="flex gap-2 items-end">
                   <div className="w-28">
@@ -357,48 +435,73 @@ export default function InventarioPage() {
       {tab === 'ajustes' && (
         <div className="card p-6 max-w-md">
           <p className="text-sm text-stone-500 mb-5">
-            Registra mermas, pérdidas o correcciones de inventario.
+            Corrige el stock de un ingrediente o registra lo que se echó a perder.
           </p>
           <div className="space-y-4">
             <div>
               <label className="label">Ingrediente</label>
-              <select
-                className="input"
+              <SearchableSelect
+                options={ingredientes.map((ing) => ({
+                  value: String(ing.id),
+                  label: `${ing.nombre} (${ing.stockActual} ${ing.unidad})`,
+                }))}
                 value={ajuste.ingredienteId}
-                onChange={(e) => setAjuste({ ...ajuste, ingredienteId: e.target.value })}
-              >
-                <option value="">Seleccionar…</option>
-                {ingredientes.map((ing) => (
-                  <option key={ing.id} value={ing.id}>
-                    {ing.nombre} ({ing.stockActual} {ing.unidad})
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setAjuste({ ...ajuste, ingredienteId: v })}
+              />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="label">Tipo</label>
-                <select
-                  className="input"
-                  value={ajuste.tipo}
-                  onChange={(e) => setAjuste({ ...ajuste, tipo: e.target.value as TipoAjuste })}
-                >
-                  <option value="AJUSTE">Ajuste</option>
-                  <option value="MERMA">Merma</option>
-                </select>
+            <div>
+              <label className="label">Qué quieres hacer</label>
+              <div className="space-y-1.5">
+                {(Object.keys(OPERACIONES) as Operacion[]).map((clave) => (
+                  <label
+                    key={clave}
+                    className={`flex items-start gap-2.5 rounded-xl border p-3 cursor-pointer transition-colors ${
+                      ajuste.operacion === clave
+                        ? 'border-forest bg-forest/5'
+                        : 'border-stone-200 hover:bg-surface-muted'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="operacion-ajuste"
+                      className="mt-0.5 accent-forest"
+                      checked={ajuste.operacion === clave}
+                      onChange={() => setAjuste({ ...ajuste, operacion: clave })}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-stone-700">
+                        {OPERACIONES[clave].etiqueta}
+                      </span>
+                      <span className="block text-xs text-stone-500">
+                        {OPERACIONES[clave].ayuda}
+                      </span>
+                    </span>
+                  </label>
+                ))}
               </div>
-              <div>
-                <label className="label">Cantidad</label>
-                <input
-                  className="input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={ajuste.cantidad}
-                  onChange={(e) => setAjuste({ ...ajuste, cantidad: e.target.value })}
-                />
-              </div>
+            </div>
+            <div>
+              <label className="label">{OPERACIONES[ajuste.operacion].etiquetaCantidad}</label>
+              <input
+                className="input"
+                type="number"
+                {...(OPERACIONES[ajuste.operacion].permiteNegativo ? {} : { min: '0' })}
+                step="0.01"
+                placeholder="0.00"
+                value={ajuste.cantidad}
+                onChange={(e) => setAjuste({ ...ajuste, cantidad: e.target.value })}
+              />
+              {vistaPreviaAjuste && (
+                <p className="text-xs text-stone-500 mt-1.5">
+                  {vistaPreviaAjuste.nombre}: {vistaPreviaAjuste.antes} →{' '}
+                  <span className={`font-medium ${
+                    vistaPreviaAjuste.despues < 0 ? 'text-red-600' : 'text-forest'
+                  }`}>
+                    {vistaPreviaAjuste.despues} {vistaPreviaAjuste.unidad}
+                  </span>
+                  {vistaPreviaAjuste.despues < 0 && ' — queda en negativo'}
+                </p>
+              )}
             </div>
             <div>
               <label className="label">Nota (opcional)</label>
@@ -421,21 +524,20 @@ export default function InventarioPage() {
       {tab === 'produccion' && (
         <div className="card p-6 max-w-lg">
           <p className="text-sm text-stone-500 mb-5">
-            Registra la producción de un ingrediente elaborado. El sistema descontará los ingredientes base y sumará el resultado al stock.
+            Produce un ingrediente elaborado a partir de su sub-receta. Descuenta los insumos
+            y suma el lote resultante. En el historial aparece como
+            <strong>Producción · usó</strong> y <strong>Producción · hizo</strong>, separado de compras y mermas.
           </p>
           <div className="space-y-4">
             <div>
               <label className="label">Ingrediente elaborado</label>
-              <select
-                className="input"
+              <SearchableSelect
+                options={(ingredientes as Ingrediente[])
+                  .filter(i => i.rendimientoLote != null)
+                  .map(i => ({ value: String(i.id), label: `${i.nombre} (${i.stockActual} ${i.unidad})` }))}
                 value={prodIngId}
-                onChange={(e) => handleSeleccionarElaborado(e.target.value)}
-              >
-                <option value="">Seleccionar…</option>
-                {(ingredientes as Ingrediente[]).filter(i => i.rendimientoLote != null).map(i => (
-                  <option key={i.id} value={i.id}>{i.nombre} ({i.stockActual} {i.unidad})</option>
-                ))}
-              </select>
+                onChange={handleSeleccionarElaborado}
+              />
               {(ingredientes as Ingrediente[]).filter(i => i.rendimientoLote != null).length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">
                   Ningún ingrediente tiene sub-receta. Define una en la pantalla de Ingredientes.
@@ -515,17 +617,17 @@ export default function InventarioPage() {
                   </td>
                   <td className="px-5 py-3 font-medium text-stone-700">{nombreIngrediente(m.ingredienteId)}</td>
                   <td className="px-5 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-md ${
-                      m.tipo === 'COMPRA'
-                        ? 'bg-green-50 text-green-700'
-                        : m.tipo === 'VENTA'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'bg-amber-50 text-amber-700'
+                    <span className={`text-xs px-2 py-0.5 rounded-md whitespace-nowrap ${
+                      MOVIMIENTOS[m.tipo]?.clase ?? 'bg-stone-100 text-stone-600'
                     }`}>
-                      {m.tipo}
+                      {MOVIMIENTOS[m.tipo]?.etiqueta ?? m.tipo}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-right font-medium text-stone-700">{m.cantidad}</td>
+                  <td className={`px-5 py-3 text-right font-medium tabular-nums ${
+                    m.cantidad < 0 ? 'text-red-600' : m.cantidad > 0 ? 'text-forest' : 'text-stone-500'
+                  }`}>
+                    {m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}
+                  </td>
                   <td className="px-5 py-3 text-stone-400 text-xs">{m.nota ?? '—'}</td>
                 </tr>
               ))}
