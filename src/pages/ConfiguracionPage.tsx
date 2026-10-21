@@ -4,6 +4,7 @@ import { isAndroidApp } from '../services/printer/androidBridge'
 import Spinner from '../components/Spinner'
 import Toast from '../components/Toast'
 import ImpresoraAndroidCard from '../components/ImpresoraAndroidCard'
+import CorregirPeriodoCard from '../components/CorregirPeriodoCard'
 
 export default function ConfiguracionPage() {
   const [iva, setIva] = useState('')
@@ -168,13 +169,15 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
+      <CorregirPeriodoCard />
+
       {isAndroidApp() && <ImpresoraAndroidCard />}
 
       <div className="mt-6 card px-5 py-4 bg-amber-50/50 border border-amber-100">
         <p className="text-xs font-semibold text-amber-700 mb-1">Nota importante</p>
         <p className="text-xs text-amber-600">
           Los cambios aplican a ventas futuras. Las ventas ya registradas conservan los montos calculados
-          al momento de su creación.
+          al momento de su creación; para corregir unas fechas en concreto usa "Corregir ventas de unas fechas".
         </p>
       </div>
     </div>

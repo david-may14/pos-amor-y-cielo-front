@@ -42,13 +42,20 @@ export async function construirRecibo(venta: VentaResponse): Promise<Uint8Array>
   if (venta.descuentoTicketNombre && venta.descuentoTicketMonto) {
     b.row(venta.descuentoTicketNombre, `-${fmt(venta.descuentoTicketMonto)}`)
   }
+  if (venta.descuentoLibreMonto) {
+    b.row('Descuento', `-${fmt(venta.descuentoLibreMonto)}`)
+  }
   if (venta.propina > 0) {
     b.row('Propina', fmt(venta.propina))
   }
   b.bold(true)
   b.row('TOTAL', fmt(venta.total + (venta.propina ?? 0)))
   b.bold(false)
-  b.line(`Pago: ${METODO_LABEL[venta.metodoPago] ?? venta.metodoPago}`)
+  if (venta.pagos && venta.pagos.length > 1) {
+    for (const p of venta.pagos) b.row(METODO_LABEL[p.metodo] ?? p.metodo, fmt(p.monto))
+  } else {
+    b.line(`Pago: ${METODO_LABEL[venta.metodoPago] ?? venta.metodoPago}`)
+  }
   b.divider()
 
   b.align('center').line('¡Gracias por tu visita!')

@@ -433,6 +433,56 @@ export interface VentaResponse {
   usuarioId?: number | null
   usuarioNombre?: string | null
   clientId?: string | null
+  pagos?: PagoVenta[]
+  propinaMetodo?: string | null
+  descuentoLibreTipo?: 'PORCENTAJE' | 'FIJO' | null
+  descuentoLibreValor?: number | null
+  descuentoLibreMonto?: number | null
+  descuentoLibreMotivo?: string | null
+  descuentoLibreUsuarioId?: number | null
+}
+/** Una parte del cobro: cuánto entró por un método. */
+export interface PagoVenta {
+  metodo: MetodoPago
+  monto: number
+}
+/** Descuento escrito en caja. Queda a nombre de quien cobra. */
+export interface DescuentoLibreRequest {
+  tipo: 'PORCENTAJE' | 'FIJO'
+  valor: number
+  motivo: string
+}
+export interface CambioPagoDTO {
+  id: number
+  usuario: string | null
+  pagosAntes: string
+  pagosDespues: string
+  comisionAntes: number
+  comisionDespues: number
+  motivo: string
+  creadoEn: string
+}
+export interface RecalculoResultado {
+  ventas: number
+  ivaAntes: number
+  ivaDespues: number
+  comisionAntes: number
+  comisionDespues: number
+  aplicado: boolean
+}
+export interface RecalculoDTO {
+  id: number
+  usuario: string | null
+  desde: string
+  hasta: string
+  ivaPorcentaje: number | null
+  comisionTarjeta: number | null
+  ventas: number
+  ivaAntes: number
+  ivaDespues: number
+  comisionAntes: number
+  comisionDespues: number
+  creadoEn: string
 }
 export interface ResumenDia {
   fecha: string

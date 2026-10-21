@@ -20,7 +20,7 @@ import { esErrorDeRed } from '../api/client'
 import { encolarVenta } from '../db/offlineSales'
 import type {
   ProductoDTO, Categoria, VentaResponse, MetodoPago, ModificadorGrupo, DescuentoView,
-  TicketResponse, TicketItemRequest, EquilibrioDTO,
+  TicketResponse, TicketItemRequest, EquilibrioDTO, PagoVenta, DescuentoLibreRequest,
 } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
@@ -93,14 +93,18 @@ const ESTADO_PENDIENTE_SYNC = 'PENDIENTE_SYNC'
 function ventaPendienteAVentaResponse(args: {
   clientId: string
   ocurrioEn: string
-  metodoPago: MetodoPago
+  metodoPago: string
+  pagos: PagoVenta[]
+  descuentoLibre: DescuentoLibreRequest | null
+  descuentoLibreMonto: number
   cart: CartItem[]
   total: number
   descuentoTicket: DescuentoView | null
   descuentoTicketMonto: number
   propina: number
 }): VentaResponse {
-  const { clientId, ocurrioEn, metodoPago, cart, total, descuentoTicket, descuentoTicketMonto, propina } = args
+  const { clientId, ocurrioEn, metodoPago, pagos, descuentoLibre, descuentoLibreMonto,
+    cart, total, descuentoTicket, descuentoTicketMonto, propina } = args
   return {
     id: 0,
     total,
@@ -125,19 +129,32 @@ function ventaPendienteAVentaResponse(args: {
     descuentoTicketMonto: descuentoTicketMonto > 0 ? descuentoTicketMonto : null,
     splitGrupo: null,
     clientId,
+    pagos,
+    descuentoLibreTipo: descuentoLibre?.tipo ?? null,
+    descuentoLibreValor: descuentoLibre?.valor ?? null,
+    descuentoLibreMonto: descuentoLibre ? descuentoLibreMonto : null,
+    descuentoLibreMotivo: descuentoLibre?.motivo ?? null,
   }
 }
 
 export default function POSPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
+  const { isAdmin, user } = useAuth()
   const { turno, loading: turnoLoading } = useTurno()
   const [productos, setProductos] = useState<ProductoDTO[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedCategoria, setSelectedCategoria] = useState<string>('Todos')
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO')
+  // Pago mixto: cuánto entra por cada método
+  const [pagoMixto, setPagoMixto] = useState(false)
+  const [montosMixtos, setMontosMixtos] = useState<Record<MetodoPago, string>>({ EFECTIVO: '', TARJETA: '', TRANSFERENCIA: '' })
+  // Descuento libre: lo escribe quien cobra y queda a su nombre
+  const [descuentoLibre, setDescuentoLibre] = useState<DescuentoLibreRequest | null>(null)
+  const [showDescLibre, setShowDescLibre] = useState(false)
+  const [descLibreForm, setDescLibreForm] = useState<{ tipo: 'PORCENTAJE' | 'FIJO'; valor: string; motivo: string }>({ tipo: 'PORCENTAJE', valor: '', motivo: '' })
+  const [descLibreError, setDescLibreError] = useState('')
   const [equilibrio, setEquilibrio] = useState<EquilibrioDTO | null>(null)
   const [propina, setPropina] = useState('')
   const [propinaCustom, setPropinaCustom] = useState(false)
@@ -464,9 +481,29 @@ export default function POSPage() {
     setExpandedNotas(new Set())
     setVistaMovil('productos')
     setDescuentoTicket(null)
+    setDescuentoLibre(null)
+    setPagoMixto(false)
+    setMontosMixtos({ EFECTIVO: '', TARJETA: '', TRANSFERENCIA: '' })
     setMontoRecibido('')
     setPropina('')
     setPropinaCustom(false)
+  }
+
+  const abrirDescuentoLibre = () => {
+    setDescLibreForm(descuentoLibre
+      ? { tipo: descuentoLibre.tipo, valor: String(descuentoLibre.valor), motivo: descuentoLibre.motivo }
+      : { tipo: 'PORCENTAJE', valor: '', motivo: '' })
+    setDescLibreError('')
+    setShowDescLibre(true)
+  }
+
+  const confirmarDescuentoLibre = () => {
+    const valor = parseFloat(descLibreForm.valor)
+    if (isNaN(valor) || valor <= 0) { setDescLibreError('El valor debe ser mayor a 0'); return }
+    if (descLibreForm.tipo === 'PORCENTAJE' && valor > 100) { setDescLibreError('El porcentaje no puede superar 100%'); return }
+    if (!descLibreForm.motivo.trim()) { setDescLibreError('Escribe el motivo del descuento'); return }
+    setDescuentoLibre({ tipo: descLibreForm.tipo, valor, motivo: descLibreForm.motivo.trim() })
+    setShowDescLibre(false)
   }
 
   // Totales
@@ -478,7 +515,26 @@ export default function POSPage() {
         ? subtotalConDesc * descuentoTicket.valor / 100
         : Math.min(descuentoTicket.valor, subtotalConDesc))
     : 0
-  const total = Math.max(0, subtotalConDesc - descuentoTicketMonto)
+  // El libre va después del de ticket, sobre lo que ya se iba a cobrar (igual que en el servidor)
+  const baseDescuentoLibre = Math.max(0, subtotalConDesc - descuentoTicketMonto)
+  const descuentoLibreMonto = descuentoLibre
+    ? (descuentoLibre.tipo === 'PORCENTAJE'
+        ? Math.round(baseDescuentoLibre * descuentoLibre.valor) / 100
+        : Math.min(descuentoLibre.valor, baseDescuentoLibre))
+    : 0
+  const total = Math.max(0, baseDescuentoLibre - descuentoLibreMonto)
+
+  const pagosMixtos: PagoVenta[] = METODOS
+    .map((m) => ({ metodo: m, monto: Math.round((parseFloat(montosMixtos[m]) || 0) * 100) / 100 }))
+    .filter((p) => p.monto > 0)
+  const faltaMixto = Math.round((total - pagosMixtos.reduce((s, p) => s + p.monto, 0)) * 100) / 100
+  const mixtoCuadra = pagosMixtos.length > 0 && Math.abs(faltaMixto) < 0.01
+  /** Completa un método con lo que falta para el total. */
+  const completarMixto = (m: MetodoPago) => {
+    const otros = METODOS.filter((x) => x !== m).reduce((s, x) => s + (parseFloat(montosMixtos[x]) || 0), 0)
+    const resto = Math.max(0, Math.round((total - otros) * 100) / 100)
+    setMontosMixtos((prev) => ({ ...prev, [m]: resto > 0 ? String(resto) : '' }))
+  }
   const propinaNum = parseFloat(propina) || 0
   const totalConPropina = total + propinaNum
 
@@ -486,6 +542,12 @@ export default function POSPage() {
     if (cart.length === 0) return
     if (!turno) {
       setError('Abre el turno en la pestaña "Turno" antes de cobrar.')
+      return
+    }
+    if (pagoMixto && !mixtoCuadra) {
+      setError(faltaMixto > 0
+        ? `Los pagos no cubren el total: faltan ${fmt(faltaMixto)}.`
+        : `Los pagos pasan el total por ${fmt(-faltaMixto)}.`)
       return
     }
     setSubmitting(true)
@@ -501,6 +563,9 @@ export default function POSPage() {
       }))
       const descuentoTicketId = descuentoTicket?.id ?? null
       const propinaFinal = propinaNum > 0 ? propinaNum : 0
+      const pagos = pagoMixto ? pagosMixtos : null
+      const metodoBase: MetodoPago = pagos ? pagos[0].metodo : metodoPago
+      const extras = { pagos, descuentoLibre }
 
       // Cobrar una comanda es cobrar sus items: se registra la venta igual que
       // una normal y la comanda se marca como cobrada en el dispositivo. Así el
@@ -515,16 +580,19 @@ export default function POSPage() {
       const ventaClientId = crypto.randomUUID()
 
       try {
-        venta = await crearVenta(items, metodoPago, descuentoTicketId, propinaFinal || undefined, null, ventaClientId)
+        venta = await crearVenta(items, metodoBase, descuentoTicketId, propinaFinal || undefined, null, ventaClientId, undefined, extras)
         if (ticketActivo) await marcarTicketCobrado(ticketActivo.clientId, ventaClientId)
       } catch (e) {
         if (!esErrorDeRed(e)) throw e
-        const pendiente = await encolarVenta({ items, metodoPago, descuentoTicketId, propina: propinaFinal })
+        const pendiente = await encolarVenta({ items, metodoPago: metodoBase, descuentoTicketId, propina: propinaFinal, ...extras })
         if (ticketActivo) await marcarTicketCobrado(ticketActivo.clientId, pendiente.clientId)
         venta = ventaPendienteAVentaResponse({
           clientId: pendiente.clientId,
           ocurrioEn: pendiente.ocurrioEn,
-          metodoPago,
+          metodoPago: pagos ? 'MIXTO' : metodoPago,
+          pagos: pagos ?? [{ metodo: metodoPago, monto: total }],
+          descuentoLibre,
+          descuentoLibreMonto,
           cart,
           total,
           descuentoTicket,
@@ -533,7 +601,8 @@ export default function POSPage() {
         })
       }
       if (ticketActivo) setTicketActivo(null)
-      if (metodoPago === 'EFECTIVO' && isPrinterAvailable()) {
+      const entroEfectivo = pagos ? pagos.some((p) => p.metodo === 'EFECTIVO') : metodoPago === 'EFECTIVO'
+      if (entroEfectivo && isPrinterAvailable()) {
         abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
       }
       setVentaExitosa(venta)
@@ -571,7 +640,7 @@ export default function POSPage() {
   }
 
   const cambio = (() => {
-    if (metodoPago !== 'EFECTIVO' || !montoRecibido) return null
+    if (pagoMixto || metodoPago !== 'EFECTIVO' || !montoRecibido) return null
     const monto = parseFloat(montoRecibido)
     if (isNaN(monto)) return null
     return monto - totalConPropina
@@ -937,9 +1006,9 @@ export default function POSPage() {
               {METODOS.map((m) => (
                 <button
                   key={m}
-                  onClick={() => { setMetodoPago(m); setMontoRecibido('') }}
+                  onClick={() => { setMetodoPago(m); setPagoMixto(false); setMontoRecibido('') }}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                    metodoPago === m
+                    !pagoMixto && metodoPago === m
                       ? 'bg-forest text-cream border-forest'
                       : 'bg-white text-stone-500 border-stone-200 hover:border-forest/50'
                   }`}
@@ -947,11 +1016,63 @@ export default function POSPage() {
                   {m === 'EFECTIVO' ? 'Efectivo' : m === 'TARJETA' ? 'Tarjeta' : 'Transfer.'}
                 </button>
               ))}
+              <button
+                onClick={() => { setPagoMixto(true); setMontoRecibido('') }}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  pagoMixto
+                    ? 'bg-forest text-cream border-forest'
+                    : 'bg-white text-stone-500 border-stone-200 hover:border-forest/50'
+                }`}
+              >
+                Mixto
+              </button>
             </div>
           </div>
 
+          {/* Pago mixto: cuánto entra por cada método */}
+          {pagoMixto && cart.length > 0 && (
+            <div className="space-y-1.5">
+              {METODOS.map((m) => (
+                <div key={m} className="flex items-center gap-2">
+                  <span className="w-20 text-xs text-stone-500">
+                    {m === 'EFECTIVO' ? 'Efectivo' : m === 'TARJETA' ? 'Tarjeta' : 'Transfer.'}
+                  </span>
+                  <div className="relative flex-1">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
+                    <input
+                      className="input pl-6 text-sm py-1.5"
+                      type="number"
+                      min={0}
+                      step="0.5"
+                      value={montosMixtos[m]}
+                      onChange={(e) => setMontosMixtos((prev) => ({ ...prev, [m]: e.target.value }))}
+                    />
+                  </div>
+                  <button
+                    onClick={() => completarMixto(m)}
+                    className="text-xs text-forest hover:underline flex-shrink-0"
+                    title="Poner aquí lo que falta"
+                  >
+                    Resto
+                  </button>
+                </div>
+              ))}
+              <div className={`flex justify-between text-sm font-semibold px-1 ${
+                mixtoCuadra ? 'text-forest' : 'text-red-500'
+              }`}>
+                <span>{mixtoCuadra ? 'Cubre el total' : faltaMixto > 0 ? 'Falta' : 'Sobra'}</span>
+                {!mixtoCuadra && <span>{fmt(Math.abs(faltaMixto))}</span>}
+              </div>
+              {propinaNum > 0 && (
+                <p className="text-xs text-stone-400 px-1">
+                  La propina se registra con {pagosMixtos.some((p) => p.metodo === 'TARJETA') ? 'la tarjeta' : 'el primer método'}.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Monto recibido + cambio (solo efectivo) */}
-          {metodoPago === 'EFECTIVO' && cart.length > 0 && (
+          {!pagoMixto && metodoPago === 'EFECTIVO' && cart.length > 0 && (
             <div>
               <p className="text-xs font-medium text-stone-500 mb-1.5">Monto recibido</p>
 
@@ -1017,6 +1138,23 @@ export default function POSPage() {
             </div>
           )}
 
+          {/* Descuento libre */}
+          {cart.length > 0 && (
+            descuentoLibre ? (
+              <div className="flex items-center justify-between gap-2 text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <button onClick={abrirDescuentoLibre} className="text-left text-amber-800">
+                  Descuento libre {descuentoLibre.tipo === 'PORCENTAJE' ? `${descuentoLibre.valor}%` : fmt(descuentoLibre.valor)}
+                  <span className="block text-amber-600">{descuentoLibre.motivo}</span>
+                </button>
+                <button onClick={() => setDescuentoLibre(null)} className="text-amber-700 hover:text-red-600 flex-shrink-0">Quitar</button>
+              </div>
+            ) : (
+              <button onClick={abrirDescuentoLibre} className="text-xs text-forest hover:underline">
+                + Descuento libre
+              </button>
+            )
+          )}
+
           {/* Propina */}
           {cart.length > 0 && (
             <div>
@@ -1070,7 +1208,7 @@ export default function POSPage() {
           )}
 
           {/* Desglose */}
-          {(totalDescuentosItems > 0 || descuentoTicketMonto > 0 || propinaNum > 0) && (
+          {(totalDescuentosItems > 0 || descuentoTicketMonto > 0 || descuentoLibreMonto > 0 || propinaNum > 0) && (
             <div className="space-y-1 text-xs text-stone-500">
               <div className="flex justify-between">
                 <span>Subtotal</span>
@@ -1086,6 +1224,12 @@ export default function POSPage() {
                 <div className="flex justify-between text-emerald-600">
                   <span>{descuentoTicket!.nombre}</span>
                   <span>−{fmt(descuentoTicketMonto)}</span>
+                </div>
+              )}
+              {descuentoLibreMonto > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Descuento libre</span>
+                  <span>−{fmt(descuentoLibreMonto)}</span>
                 </div>
               )}
               {propinaNum > 0 && (
@@ -1142,6 +1286,51 @@ export default function POSPage() {
       </aside>
 
       {/* ── Modal modificadores + descuento ── */}
+      {showDescLibre && (
+        <Modal title="Descuento libre" onClose={() => setShowDescLibre(false)} size="sm">
+          <div className="space-y-3">
+            <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+              Este descuento no está dado de alta. Quedará registrado a nombre de
+              <strong> {user?.nombre ?? 'quien cobra'}</strong>, con el motivo que escribas, y lo verá el administrador.
+            </div>
+            <div className="flex gap-2">
+              {(['PORCENTAJE', 'FIJO'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setDescLibreForm((p) => ({ ...p, tipo: t }))}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                    descLibreForm.tipo === t ? 'bg-forest text-cream border-forest' : 'bg-white text-stone-500 border-stone-200'
+                  }`}
+                >
+                  {t === 'PORCENTAJE' ? 'Porcentaje' : 'Monto fijo'}
+                </button>
+              ))}
+            </div>
+            <input
+              className="input text-sm"
+              type="number"
+              min={0}
+              step="0.5"
+              placeholder={descLibreForm.tipo === 'PORCENTAJE' ? '% de descuento' : '$ de descuento'}
+              value={descLibreForm.valor}
+              onChange={(e) => setDescLibreForm((p) => ({ ...p, valor: e.target.value }))}
+            />
+            <input
+              className="input text-sm"
+              maxLength={200}
+              placeholder="Motivo (obligatorio)"
+              value={descLibreForm.motivo}
+              onChange={(e) => setDescLibreForm((p) => ({ ...p, motivo: e.target.value }))}
+            />
+            {descLibreError && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{descLibreError}</p>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowDescLibre(false)} className="btn-secondary text-sm">Cancelar</button>
+              <button onClick={confirmarDescuentoLibre} className="btn-primary text-sm">Aplicar a mi nombre</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {modModal && (
         <Modal title={modModal.producto.nombre} onClose={() => setModModal(null)} size="sm">
           <div className="space-y-5">

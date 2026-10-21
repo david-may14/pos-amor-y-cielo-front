@@ -47,21 +47,31 @@ export default function CosteoPage() {
   const [guardandoPrecio, setGuardandoPrecio] = useState<number | null>(null)
   const [errorPrecio, setErrorPrecio] = useState<Record<number, string>>({})
   const [iva, setIva] = useState(0)
+  const [comision, setComision] = useState(0)
   const [soloSinReceta, setSoloSinReceta] = useState(false)
 
   // costoBase = costoConMargen si existe, si no costoTotal
   const costoBase = (p: CosteoResumenDTO | CosteoDTO) => p.costoConMargen ?? p.costoTotal
 
+  /**
+   * Lo que de verdad queda del precio: sin el IVA que va dentro y sin la
+   * comisión de la terminal, que se cobra sobre el precio completo. Se asume
+   * pago con tarjeta: es el caso que menos deja, y el margen debe aguantarlo.
+   */
+  const netoReal = (precioVenta: number) => {
+    const sinIva = iva > 0 ? precioVenta / (1 + iva / 100) : precioVenta
+    return sinIva - precioVenta * comision / 100
+  }
+
   const margenRealPct = (precioVenta: number, base: number) => {
     if (base <= 0 || precioVenta <= 0) return null
     const neto = iva > 0 ? precioVenta / (1 + iva / 100) : precioVenta
-    return (neto - base) / neto * 100
+    return (netoReal(precioVenta) - base) / neto * 100
   }
 
   const margenRealAbs = (precioVenta: number, base: number) => {
     if (base <= 0 || precioVenta <= 0) return null
-    const neto = iva > 0 ? precioVenta / (1 + iva / 100) : precioVenta
-    return neto - base
+    return netoReal(precioVenta) - base
   }
 
   const foodCostPct = (precioVenta: number, base: number) => {
@@ -77,9 +87,21 @@ export default function CosteoPage() {
 
   useEffect(() => {
     Promise.all([listarCosteo(), obtenerConfiguracion()])
-      .then(([prods, config]) => { setProductos(prods); setIva(config.ivaPorcentaje) })
+      .then(([prods, config]) => { setProductos(prods); setIva(config.ivaPorcentaje); setComision(config.comisionTarjeta) })
       .catch(() => setError('Error al cargar costeo'))
       .finally(() => setLoading(false))
+  }, [])
+
+  // Si se cambia el IVA o la comisión en otra pestaña, los colores se ponen al día al volver
+  useEffect(() => {
+    const alVolver = () => {
+      if (document.visibilityState !== 'visible') return
+      obtenerConfiguracion()
+        .then((c) => { setIva(c.ivaPorcentaje); setComision(c.comisionTarjeta) })
+        .catch(() => {})
+    }
+    document.addEventListener('visibilitychange', alVolver)
+    return () => document.removeEventListener('visibilitychange', alVolver)
   }, [])
 
   const handleExpandir = async (id: number) => {
@@ -123,10 +145,13 @@ export default function CosteoPage() {
     aplicarActualizacionMargen(productoId, null)
   }
 
-  // precioConIVA = (costoTotal / (1 - margen%)) * (1 + iva%)
+  // Con n = precio sin IVA y la comisión cobrada sobre el precio con IVA:
+  // n − n(1+iva)·com − costo = margen·n  →  n = costo / (1 − margen − (1+iva)·com)
   const calcPrecioDesdeMargen = (costoTotal: number, margenPct: number): number | null => {
     if (costoTotal <= 0 || margenPct <= 0 || margenPct >= 100) return null
-    const precioNeto = costoTotal / (1 - margenPct / 100)
+    const divisor = 1 - margenPct / 100 - (1 + iva / 100) * comision / 100
+    if (divisor <= 0) return null
+    const precioNeto = costoTotal / divisor
     return Math.round(precioNeto * (1 + iva / 100) * 100) / 100
   }
 
@@ -241,6 +266,9 @@ export default function CosteoPage() {
         <div>
           <h1 className="text-xl font-semibold text-stone-800">Costeo de productos</h1>
           <p className="text-sm text-stone-400 mt-0.5">Desglose de costo por ingrediente, margen y tendencia</p>
+          <p className="text-xs text-stone-400 mt-0.5">
+            El margen neto descuenta el IVA ({iva}%) y la comisión de tarjeta ({comision}%).
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -498,7 +526,7 @@ export default function CosteoPage() {
                                 const usandoMargenSeg = d.costoConMargen != null
                                 const precioSinIVA = iva > 0 ? d.precioVenta / (1 + iva / 100) : d.precioVenta
                                 const margenReal = precioSinIVA > 0 && base > 0
-                                  ? ((precioSinIVA - base) / precioSinIVA * 100)
+                                  ? ((netoReal(d.precioVenta) - base) / precioSinIVA * 100)
                                   : null
                                 const margenInput = margenParaPrecio[p.productoId] ?? ''
                                 const precioCalc = margenInput ? calcPrecioDesdeMargen(base, parseFloat(margenInput)) : null
@@ -553,7 +581,7 @@ export default function CosteoPage() {
                                       // precio directo → margen resultante
                                       const precioDirecto = parseFloat(margenParaPrecio[`precio_${p.productoId}`] ?? '')
                                       const margenDesdePrecio = !isNaN(precioDirecto) && precioDirecto > 0 && base > 0
-                                        ? ((precioDirecto / (1 + iva / 100) - base) / (precioDirecto / (1 + iva / 100)) * 100)
+                                        ? ((netoReal(precioDirecto) - base) / (precioDirecto / (1 + iva / 100)) * 100)
                                         : null
                                       // margen → precio resultante
                                       const margenDeseado = parseFloat(margenInput)
