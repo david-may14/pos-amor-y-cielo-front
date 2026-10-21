@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { listarIngredientes, crearIngrediente, actualizarIngrediente, obtenerSubreceta, guardarSubreceta, eliminarSubreceta, exportarIngredientes } from '../api/ingredientes'
+import { listarIngredientes, crearIngrediente, actualizarIngrediente, obtenerSubreceta, guardarSubreceta, eliminarSubreceta, eliminarIngrediente, exportarIngredientes } from '../api/ingredientes'
 import { registrarAjuste } from '../api/inventario'
 import type { Ingrediente, SubrecetaDTO, IngImportResult } from '../types/api'
 import Modal from '../components/Modal'
@@ -58,6 +58,11 @@ export default function IngredientesPage() {
   const [formError, setFormError] = useState('')
 
   const [showImport, setShowImport] = useState(false)
+
+  // Borrar
+  const [borrando, setBorrando] = useState<Ingrediente | null>(null)
+  const [borrarError, setBorrarError] = useState('')
+  const [borrandoEnCurso, setBorrandoEnCurso] = useState(false)
   const [importResult, setImportResult] = useState<IngImportResult | null>(null)
   const [preciosIng, setPreciosIng] = useState<Ingrediente | null>(null)
 
@@ -192,6 +197,21 @@ export default function IngredientesPage() {
     setForm(emptyForm())
     setFormError('')
     setShowForm(true)
+  }
+
+  const handleBorrar = async () => {
+    if (!borrando) return
+    setBorrandoEnCurso(true)
+    setBorrarError('')
+    try {
+      await eliminarIngrediente(borrando.id)
+      setIngredientes((prev) => prev.filter((x) => x.id !== borrando.id))
+      setBorrando(null)
+    } catch (e: unknown) {
+      setBorrarError(e instanceof Error ? e.message : 'Error al borrar')
+    } finally {
+      setBorrandoEnCurso(false)
+    }
   }
 
   const openEdit = (ing: Ingrediente) => {
@@ -410,6 +430,7 @@ export default function IngredientesPage() {
                         <button onClick={() => openSubreceta(ing)} className="text-xs text-blue-600 hover:underline">Sub-receta</button>
                       )}
                       <button onClick={() => openEdit(ing)} className="text-xs text-forest hover:underline">Editar</button>
+                      <button onClick={() => { setBorrando(ing); setBorrarError('') }} className="text-xs text-red-400 hover:text-red-600">Borrar</button>
                     </div>
                   </td>
                 </tr>
@@ -418,6 +439,22 @@ export default function IngredientesPage() {
           </tbody>
         </table>
       </div>
+
+      {borrando && (
+        <Modal title={`Borrar ${borrando?.nombre ?? ''}`} onClose={() => setBorrando(null)} size="sm">
+          <p className="text-sm text-stone-600">
+            Dejará de aparecer en inventario, alertas y compras. Su historial de movimientos se conserva.
+          </p>
+          {borrarError && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg mt-3">{borrarError}</p>}
+          <div className="flex justify-end gap-2 mt-5">
+            <button onClick={() => setBorrando(null)} className="btn-secondary text-sm">Cancelar</button>
+            <button onClick={handleBorrar} disabled={borrandoEnCurso}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+              {borrandoEnCurso ? 'Borrando…' : 'Borrar'}
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {showForm && (
         <Modal

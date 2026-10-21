@@ -23,6 +23,10 @@ export const obtenerSubreceta = (id: number) =>
 export const guardarSubreceta = (id: number, data: SubrecetaRequest) =>
   api.put<SubrecetaDTO>(`/api/ingredientes/${id}/subreceta`, data)
 
+/** Lo desactiva; el backend se niega si alguna receta, plantilla o modificador vivo lo usa. */
+export const eliminarIngrediente = (id: number) =>
+  api.delete<void>(`/api/ingredientes/${id}`)
+
 export const eliminarSubreceta = (id: number) =>
   api.delete<void>(`/api/ingredientes/${id}/subreceta`)
 
