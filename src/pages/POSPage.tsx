@@ -24,6 +24,7 @@ import type {
 } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
+import PantallaCarga from '../components/PantallaCarga'
 import SplitCuentaModal from '../components/SplitCuentaModal'
 
 interface CartMod {
@@ -137,6 +138,9 @@ function ventaPendienteAVentaResponse(args: {
   }
 }
 
+/** Si el catálogo ya cargó una vez en esta sesión: las recargas siguientes no tapan la pantalla. */
+let catalogoCargado = false
+
 export default function POSPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -209,6 +213,7 @@ export default function POSPage() {
         setError(e instanceof Error ? e.message : 'Error al cargar')
       }
     } finally {
+      catalogoCargado = true
       setLoading(false)
     }
   }, [])
@@ -659,6 +664,8 @@ export default function POSPage() {
     .filter((p) => !busqueda.trim() || p.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
 
   if (loading) {
+    // Al abrir la app, la caja es lo primero que espera al servidor
+    if (!catalogoCargado) return <PantallaCarga />
     return (
       <div className="flex-1 flex items-center justify-center">
         <Spinner className="w-8 h-8 text-forest" />
