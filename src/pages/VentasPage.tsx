@@ -635,7 +635,7 @@ function ModalCambiarPago({ venta, onListo, onCerrar }: {
         </div>
         {METODOS_PAGO.map((m) => (
           <div key={m} className="flex items-center gap-2">
-            <span className="w-24 text-xs text-stone-500">{ETIQUETA_METODO[m]}</span>
+            <span className="w-28 flex-shrink-0 text-xs text-stone-500">{ETIQUETA_METODO[m]}</span>
             <input className="input text-sm py-1.5" type="number" min={0} step="0.5"
               value={montos[m]} onChange={(e) => setMontos((prev) => ({ ...prev, [m]: e.target.value }))} />
           </div>
