@@ -160,21 +160,32 @@ export default function EquilibrioPage() {
 
       {/* Breakdown chips */}
       {equilibrio && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-          <div className="card p-4 text-center">
-            <p className="text-xs text-stone-400 mb-1">Gastos fijos</p>
-            <p className="font-semibold text-stone-800">{fmt(totalGastos)}</p>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <div className="card p-4 text-center">
+              <p className="text-xs text-stone-400 mb-1">Gastos fijos</p>
+              <p className="font-semibold text-stone-800">{fmt(totalGastos)}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-stone-400 mb-1">Margen de utilidad</p>
+              <p className="font-semibold text-stone-800">{margenBruto > 0 ? `${margenBruto.toFixed(1)}%` : '—'}</p>
+              <p className="text-xs text-stone-300 mt-0.5">este mes</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-stone-400 mb-1">Meta de ventas</p>
+              <p className="font-semibold text-stone-800">{totalGastos > 0 && margenBruto > 0 ? fmt(metaVentas) : '—'}</p>
+            </div>
           </div>
-          <div className="card p-4 text-center">
-            <p className="text-xs text-stone-400 mb-1">Margen bruto</p>
-            <p className="font-semibold text-stone-800">{margenBruto > 0 ? `${margenBruto.toFixed(1)}%` : '—'}</p>
-            <p className="text-xs text-stone-300 mt-0.5">este mes</p>
+
+          {/* De dónde sale la utilidad: lo cobrado menos lo que no es del negocio */}
+          <div className="card p-4 mb-6 text-sm">
+            <div className="flex justify-between py-0.5"><span className="text-stone-500">Ventas cobradas</span><span className="text-stone-800">{fmt(ingresos)}</span></div>
+            <div className="flex justify-between py-0.5"><span className="text-stone-500">− IVA</span><span className="text-stone-600">{fmt(equilibrio.ivaDelMes)}</span></div>
+            <div className="flex justify-between py-0.5"><span className="text-stone-500">− Comisiones de tarjeta</span><span className="text-stone-600">{fmt(equilibrio.comisionesDelMes)}</span></div>
+            <div className="flex justify-between py-0.5"><span className="text-stone-500">− Costo de lo vendido</span><span className="text-stone-600">{fmt(equilibrio.costoDelMes)}</span></div>
+            <div className="flex justify-between pt-1.5 mt-1 border-t border-stone-100 font-semibold"><span className="text-stone-700">Utilidad</span><span className="text-stone-800">{fmt(equilibrio.utilidadDelMes)}</span></div>
           </div>
-          <div className="card p-4 text-center">
-            <p className="text-xs text-stone-400 mb-1">Meta de ventas</p>
-            <p className="font-semibold text-stone-800">{totalGastos > 0 && margenBruto > 0 ? fmt(metaVentas) : '—'}</p>
-          </div>
-        </div>
+        </>
       )}
 
       {/* Gastos fijos */}

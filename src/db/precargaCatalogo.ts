@@ -2,7 +2,7 @@ import { esErrorDeRed } from '../api/client'
 import { listarProductosOffline, listarModificadoresProductoOffline } from '../api/productos'
 import { listarCategoriasOffline } from '../api/categorias'
 import {
-  getDescuentoAplicableOffline, listarDescuentosOffline, listarDescuentosTicketOffline,
+  getDescuentoAplicableOffline, listarDescuentosAplicables, listarDescuentosOffline, listarDescuentosTicketOffline,
 } from '../api/descuentos'
 import { offlineDb } from './offlineDb'
 import type { DescuentoView, ProductoDTO } from '../types/api'
@@ -46,10 +46,8 @@ async function ejecutarPrecarga(): Promise<boolean> {
       listarDescuentosOffline().catch(() => [] as DescuentoView[]),
     ])
 
-    await enLotes(productos, (p: ProductoDTO) => Promise.all([
-      listarModificadoresProductoOffline(p.id),
-      getDescuentoAplicableOffline(p.id),
-    ]))
+    await enLotes(productos, (p: ProductoDTO) => listarModificadoresProductoOffline(p.id))
+    await refrescarDescuentosAplicables(productos)
 
     await offlineDb.cache.put({
       key: CLAVE_PRECARGA,
@@ -60,6 +58,28 @@ async function ejecutarPrecarga(): Promise<boolean> {
   } catch (e) {
     if (esErrorDeRed(e)) return false
     return false
+  }
+}
+
+/**
+ * Reescribe la copia local del descuento de cada producto. Tiene que ir a la
+ * red: la caja lee esa copia sin preguntar (getCacheado), así que si la
+ * precarga también la reutilizaba, un descuento recién creado no aparecía
+ * hasta el siguiente turno.
+ */
+export async function refrescarDescuentosAplicables(productos?: ProductoDTO[]): Promise<void> {
+  try {
+    const aplicables = await listarDescuentosAplicables()
+    const ahora = new Date().toISOString()
+    await offlineDb.cache.bulkPut(aplicables.map((a) => ({
+      key: `descuentoAplicable:${a.productoId}`,
+      data: a.descuento,
+      actualizadoEn: ahora,
+    })))
+  } catch (e) {
+    if (esErrorDeRed(e) || !productos) return
+    // Un backend sin el endpoint todavía: producto por producto, como antes.
+    await enLotes(productos, (p: ProductoDTO) => getDescuentoAplicableOffline(p.id))
   }
 }
 

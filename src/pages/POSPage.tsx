@@ -1415,7 +1415,7 @@ export default function POSPage() {
                 </div>
                 {equilibrio.faltante > 0 && (
                   <p className="text-xs text-stone-500">
-                    {fmt(equilibrio.ingresosDelMes)} de {fmt(equilibrio.totalGastosFijos)} · faltan <strong className="text-stone-700">{fmt(equilibrio.faltante)}</strong>
+                    {fmt(equilibrio.ingresosDelMes)} de {fmt(equilibrio.metaVentas)} · faltan <strong className="text-stone-700">{fmt(equilibrio.faltante)}</strong>
                   </p>
                 )}
               </div>

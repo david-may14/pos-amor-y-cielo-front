@@ -492,7 +492,10 @@ export interface EquilibrioDTO {
   totalGastosFijos: number
   ingresosDelMes: number
   costoDelMes: number
-  margenBruto: number       // 0-100
+  ivaDelMes: number
+  comisionesDelMes: number
+  utilidadDelMes: number    // ingresos - IVA - comisiones - costo
+  margenBruto: number       // utilidad / ingresos, 0-100
   metaVentas: number        // ventas necesarias para cubrir gastos fijos
   faltante: number
   porcentaje: number

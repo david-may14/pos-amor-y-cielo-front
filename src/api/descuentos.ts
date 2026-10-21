@@ -39,6 +39,10 @@ export const getDescuentoAplicableOffline = (productoId: number) =>
     `/api/descuentos/aplicable/producto/${productoId}`,
   )
 
+/** El descuento vigente de cada producto activo, en una sola petición. */
+export const listarDescuentosAplicables = () =>
+  api.get<{ productoId: number; descuento: DescuentoView | null }[]>('/api/descuentos/aplicables')
+
 export const listarDescuentosTicket = () =>
   api.get<DescuentoView[]>('/api/descuentos/ticket-activos')
 
