@@ -40,6 +40,17 @@
   .safe-right {
     padding-right: env(safe-area-inset-right);
   }
+  /*
+   * En la tablet (app de Android, pantalla ancha) no hay encabezado: lo
+   * primero de cada pantalla, como las categorías de la caja, quedaba pegado
+   * al borde de arriba, y al tocarlo se abría la cortina de notificaciones.
+   * Se deja libre la barra de estado y un margen para el dedo.
+   */
+  @media (min-width: 1024px) {
+    .app-android .margen-gesto {
+      padding-top: calc(env(safe-area-inset-top) + 1.25rem);
+    }
+  }
 }
 
 @layer components {
