@@ -10,6 +10,12 @@ import Modal from '../components/Modal'
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
+/** La hora de la venta; con un rango de varios días, también el día ("lun 20 oct, 14:35"). */
+const fmtMomento = (iso: string, conDia: boolean) =>
+  new Date(iso).toLocaleString('es-MX', conDia
+    ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
+    : { hour: '2-digit', minute: '2-digit' })
+
 
 
 type DisplayItem =
@@ -35,6 +41,7 @@ export default function VentasPage() {
   const { isAdmin, puedeSupervisar } = useAuth()
   const [desde, setDesde] = useState(hoy())
   const [hasta, setHasta] = useState(hoy())
+  const variosDias = desde !== hasta
   const [ventas, setVentas] = useState<VentaResponse[]>([])
   const [resumen, setResumen] = useState<ResumenDia | null>(null)
   const [loading, setLoading] = useState(true)
@@ -289,7 +296,7 @@ export default function VentasPage() {
                 <thead>
                   <tr className="border-b border-stone-100 text-left">
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide"># Venta</th>
-                    <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Hora</th>
+                    <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">{variosDias ? 'Fecha' : 'Hora'}</th>
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Barista</th>
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Items</th>
                     <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Método</th>
@@ -301,7 +308,7 @@ export default function VentasPage() {
                   {displayItems.map((row) => {
                     if (row.kind === 'group-header') {
                       const totalGrupo = row.miembros.reduce((s, m) => s + m.total, 0)
-                      const hora = new Date(row.miembros[0].creadaEn).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+                      const hora = fmtMomento(row.miembros[0].creadaEn, variosDias)
                       return (
                         <tr key={`gh-${row.grupo}`} className="bg-amber-50/70 border-b-0">
                           <td colSpan={7} className="px-5 py-2">
@@ -329,7 +336,7 @@ export default function VentasPage() {
                           )}
                         </td>
                         <td className="px-5 py-3 text-stone-500">
-                          {new Date(v.creadaEn).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                          {fmtMomento(v.creadaEn, variosDias)}
                         </td>
                         <td className="px-5 py-3">
                           {v.usuarioNombre
