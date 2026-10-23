@@ -397,7 +397,9 @@ export default function POSPage() {
       // Si mientras tanto se cerró el modal o se tocó otro producto, esta
       // respuesta ya no le corresponde a nadie.
       setModModal((prev) => prev && prev.producto.id === producto.id
-        ? { ...prev, grupos, descuentoAplicable, descuentoActivo: !!descuentoAplicable, cargando: false }
+        // El descuento llega sin marcar: se aplica solo si quien cobra lo toca.
+        // Marcado por defecto, uno de 100% regalaba la bebida por descuido.
+        ? { ...prev, grupos, descuentoAplicable, descuentoActivo: false, cargando: false }
         : prev)
     } catch {
       // Sin datos no hay opciones que elegir: se agrega tal cual, como antes.
@@ -1427,7 +1429,7 @@ export default function POSPage() {
                     −{fmtDescuento(modModal.descuentoAplicable)}
                   </span>
                 </button>
-                <p className="text-xs text-stone-400 mt-1 pl-1">Descuento aplicable — desmarca para no aplicar</p>
+                <p className="text-xs text-stone-400 mt-1 pl-1">Descuento disponible — márcalo para aplicarlo</p>
               </div>
             )}
 
