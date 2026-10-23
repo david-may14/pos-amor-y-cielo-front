@@ -4,6 +4,7 @@ import { isAndroidApp } from '../services/printer/androidBridge'
 import Spinner from '../components/Spinner'
 import Toast from '../components/Toast'
 import ImpresoraAndroidCard from '../components/ImpresoraAndroidCard'
+import { ModalFechasPorcentaje, HistorialCorrecciones } from '../components/CambioPorcentajes'
 
 export default function ConfiguracionPage() {
   const [iva, setIva] = useState('')
@@ -13,6 +14,13 @@ export default function ConfiguracionPage() {
   const [guardando, setGuardando] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
   const [error, setError] = useState('')
+  // Lo que hay guardado, para saber si el IVA o la comisión cambian
+  const [guardado, setGuardado] = useState({ iva: 0, comision: 0 })
+  const [pidiendoFechas, setPidiendoFechas] = useState<{
+    iva: { antes: number; despues: number } | null
+    comision: { antes: number; despues: number } | null
+  } | null>(null)
+  const [recargarHistorial, setRecargarHistorial] = useState(0)
 
   useEffect(() => {
     obtenerConfiguracion()
@@ -20,6 +28,7 @@ export default function ConfiguracionPage() {
         setIva(String(c.ivaPorcentaje))
         setComision(String(c.comisionTarjeta))
         setDiasRevision(String(c.diasRevisionReceta ?? 30))
+        setGuardado({ iva: c.ivaPorcentaje, comision: c.comisionTarjeta })
       })
       .catch(() => setError('No se pudo cargar la configuración'))
       .finally(() => setLoading(false))
@@ -36,20 +45,43 @@ export default function ConfiguracionPage() {
       setError('Comisión debe ser entre 0 y 20%')
       return
     }
-    setGuardando(true)
     setError('')
+    // Otro IVA o comisión se guarda solo indicando desde qué día aplica
+    const cambiaIva = ivaNum !== guardado.iva
+    const cambiaComision = comisionNum !== guardado.comision
+    if (cambiaIva || cambiaComision) {
+      setPidiendoFechas({
+        iva: cambiaIva ? { antes: guardado.iva, despues: ivaNum } : null,
+        comision: cambiaComision ? { antes: guardado.comision, despues: comisionNum } : null,
+      })
+      return
+    }
+    setGuardando(true)
     try {
-      const dias = parseInt(diasRevision) || 30
-      const res = await actualizarConfiguracion({ ivaPorcentaje: ivaNum, comisionTarjeta: comisionNum, diasRevisionReceta: dias })
-      setIva(String(res.ivaPorcentaje))
-      setComision(String(res.comisionTarjeta))
-      setDiasRevision(String(res.diasRevisionReceta))
-      setToastMsg('Configuración guardada')
+      await guardar()
     } catch {
       setError('Error al guardar la configuración')
     } finally {
       setGuardando(false)
     }
+  }
+
+  const guardar = async (desde?: string, hasta?: string) => {
+    const dias = parseInt(diasRevision) || 30
+    const res = await actualizarConfiguracion({
+      ivaPorcentaje: parseFloat(iva), comisionTarjeta: parseFloat(comision), diasRevisionReceta: dias, desde, hasta,
+    })
+    setIva(String(res.ivaPorcentaje))
+    setComision(String(res.comisionTarjeta))
+    setDiasRevision(String(res.diasRevisionReceta))
+    setGuardado({ iva: res.ivaPorcentaje, comision: res.comisionTarjeta })
+    setToastMsg('Configuración guardada')
+  }
+
+  const guardarConFechas = async (desde: string, hasta: string) => {
+    await guardar(desde, hasta)
+    setPidiendoFechas(null)
+    setRecargarHistorial((n) => n + 1)
   }
 
   if (loading) {
@@ -64,7 +96,8 @@ export default function ConfiguracionPage() {
     <div className="flex-1 overflow-y-auto p-6 max-w-lg mx-auto">
       <h1 className="text-xl font-semibold text-stone-800 mb-2">Configuración financiera</h1>
       <p className="text-sm text-stone-400 mb-8">
-        Estos valores afectan el cálculo de utilidad en reportes. Los porcentajes se aplican a todas las ventas nuevas.
+        Estos valores afectan el cálculo de utilidad en reportes. Al cambiar el IVA o la comisión se pregunta
+        desde qué día aplica, y las ventas de esas fechas se corrigen.
       </p>
 
       {error && (
@@ -168,13 +201,23 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
+      <HistorialCorrecciones recargar={recargarHistorial} />
+
+      {pidiendoFechas && (
+        <ModalFechasPorcentaje
+          iva={pidiendoFechas.iva}
+          comision={pidiendoFechas.comision}
+          onGuardar={guardarConFechas}
+          onCerrar={() => setPidiendoFechas(null)}
+        />
+      )}
+
       {isAndroidApp() && <ImpresoraAndroidCard />}
 
       <div className="mt-6 card px-5 py-4 bg-amber-50/50 border border-amber-100">
         <p className="text-xs font-semibold text-amber-700 mb-1">Nota importante</p>
         <p className="text-xs text-amber-600">
-          Los cambios aplican a ventas futuras. Las ventas ya registradas conservan los montos calculados
-          al momento de su creación.
+          Las ventas fuera de las fechas que indiques conservan el porcentaje con el que se cobraron.
         </p>
       </div>
     </div>

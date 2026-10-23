@@ -1,8 +1,15 @@
 import { api } from './client'
 import type {
   VentaResponse, ResumenDia, ResumenPeriodo, ItemRequest,
-  MotivoAnulacion, AnulacionDTO,
+  MotivoAnulacion, AnulacionDTO, PagoVenta, DescuentoLibreRequest, CambioPagoDTO,
 } from '../types/api'
+
+/** Lo que una venta puede llevar además de lo básico. */
+export interface ExtrasVenta {
+  /** Cobro repartido entre métodos; tiene que sumar el total. */
+  pagos?: PagoVenta[] | null
+  descuentoLibre?: DescuentoLibreRequest | null
+}
 
 export const reportePeriodo = (desde: string, hasta: string) =>
   api.get<ResumenPeriodo>(`/api/ventas/reporte?desde=${desde}&hasta=${hasta}`)
@@ -48,8 +55,18 @@ export const crearVenta = (
   splitGrupo?: string | null,
   clientId?: string,
   ocurrioEn?: string,
+  extras?: ExtrasVenta,
 ) => api.post<VentaResponse>('/api/ventas', {
   items, metodoPago, descuentoTicketId, propina: propina ?? 0, splitGrupo: splitGrupo ?? null,
   ...(clientId ? { clientId } : {}),
   ...(ocurrioEn ? { ocurrioEn } : {}),
+  ...(extras?.pagos?.length ? { pagos: extras.pagos } : {}),
+  ...(extras?.descuentoLibre ? { descuentoLibre: extras.descuentoLibre } : {}),
 })
+
+/** Corrige cómo se pagó una venta ya cobrada. Queda en bitácora con el motivo. */
+export const cambiarPagosVenta = (id: number, pagos: PagoVenta[], motivo: string) =>
+  api.put<VentaResponse>(`/api/ventas/${id}/pagos`, { pagos, motivo })
+
+export const listarCambiosPago = (id: number) =>
+  api.get<CambioPagoDTO[]>(`/api/ventas/${id}/cambios-pago`)

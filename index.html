@@ -10,9 +10,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Pantalla de carga antes de que llegue el JavaScript. React la reemplaza
+         al pintar; src/components/PantallaCarga.tsx es su gemela. -->
+    <style>
+      #arranque { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+        justify-content: center; gap: 2rem; background: #2d3d1f; }
+      #arranque img { width: 11rem; max-width: 60vw; }
+      #arranque i { width: 1.75rem; height: 1.75rem; border-radius: 50%; border: 4px solid rgba(246, 226, 193, .25);
+        border-top-color: #f6e2c1; animation: arranque-giro 1s linear infinite; }
+      @keyframes arranque-giro { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div id="arranque"><img src="/logo-cream.svg" alt="Amor y Cielo" /><i></i></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

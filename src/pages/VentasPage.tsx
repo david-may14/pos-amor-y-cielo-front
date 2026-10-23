@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { listarVentas, resumenDia, anularVenta, listarAnulaciones } from '../api/ventas'
+import { listarVentas, resumenDia, anularVenta, listarAnulaciones, cambiarPagosVenta, listarCambiosPago } from '../api/ventas'
 import { MOTIVOS_ANULACION, ETIQUETA_MOTIVO } from '../types/api'
-import type { MotivoAnulacion, AnulacionDTO, VentaResponse, ResumenDia } from '../types/api'
+import type { MotivoAnulacion, AnulacionDTO, VentaResponse, ResumenDia, MetodoPago, PagoVenta, CambioPagoDTO } from '../types/api'
 import { useAuth } from '../contexts/AuthContext'
 import Spinner from '../components/Spinner'
 import { hoy, diasAtras } from '../utils/fecha'
@@ -43,6 +43,21 @@ export default function VentasPage() {
   const [anulando, setAnulando] = useState<number | null>(null)
   const [porAnular, setPorAnular] = useState<VentaResponse | null>(null)
   const [verBitacora, setVerBitacora] = useState(false)
+  const [cambiandoPago, setCambiandoPago] = useState<VentaResponse | null>(null)
+  const [cambiosPago, setCambiosPago] = useState<CambioPagoDTO[]>([])
+
+  // Al abrir una venta se trae su historial de cambios de pago
+  useEffect(() => {
+    setCambiosPago([])
+    if (!detalle || !puedeSupervisar) return
+    listarCambiosPago(detalle.id).then(setCambiosPago).catch(() => {})
+  }, [detalle, puedeSupervisar])
+
+  const onPagoCambiado = (v: VentaResponse) => {
+    setVentas((prev) => prev.map((x) => (x.id === v.id ? { ...x, ...v } : x)))
+    setDetalle((prev) => (prev && prev.id === v.id ? { ...prev, ...v } : prev))
+    setCambiandoPago(null)
+  }
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -451,10 +466,31 @@ export default function VentasPage() {
                   <span>−{fmt(detalle.descuentoTicketMonto)}</span>
                 </div>
               )}
+              {detalle.descuentoLibreMonto != null && detalle.descuentoLibreMonto > 0 && (
+                <div className="text-sm text-emerald-600">
+                  <div className="flex justify-between">
+                    <span>Desc. libre {detalle.descuentoLibreTipo === 'PORCENTAJE' ? `${detalle.descuentoLibreValor}%` : ''}</span>
+                    <span>−{fmt(detalle.descuentoLibreMonto)}</span>
+                  </div>
+                  <p className="text-xs text-amber-700">
+                    {detalle.descuentoLibreMotivo}{detalle.usuarioNombre ? ` · dado por ${detalle.usuarioNombre}` : ''}
+                  </p>
+                </div>
+              )}
               {detalle.propina > 0 && (
                 <div className="flex justify-between text-sm text-amber-600">
-                  <span>Propina</span>
+                  <span>Propina{detalle.propinaMetodo ? ` (${ETIQUETA_METODO[detalle.propinaMetodo as MetodoPago] ?? detalle.propinaMetodo})` : ''}</span>
                   <span>+{fmt(detalle.propina)}</span>
+                </div>
+              )}
+              {detalle.pagos && detalle.pagos.length > 1 && (
+                <div className="text-sm text-stone-500 bg-stone-50 rounded-lg px-3 py-2 space-y-0.5">
+                  {detalle.pagos.map((pg, i) => (
+                    <div key={i} className="flex justify-between">
+                      <span>{ETIQUETA_METODO[pg.metodo] ?? pg.metodo}</span>
+                      <span>{fmt(pg.monto)}</span>
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="flex justify-between text-sm text-stone-400">
@@ -481,6 +517,29 @@ export default function VentasPage() {
               </div>
             </div>
 
+            {cambiosPago.length > 0 && (
+              <div className="text-xs text-stone-500 border-t border-stone-100 pt-3 space-y-1.5">
+                <p className="font-medium text-stone-600">Cambios de pago</p>
+                {cambiosPago.map((c) => (
+                  <div key={c.id}>
+                    <p>{c.pagosAntes} → <span className="text-stone-700">{c.pagosDespues}</span></p>
+                    <p className="text-stone-400">
+                      {new Date(c.creadoEn).toLocaleString('es-MX')}{c.usuario ? ` · ${c.usuario}` : ''} · {c.motivo}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {puedeSupervisar && detalle.estado !== 'ANULADA' && (
+              <button
+                onClick={() => setCambiandoPago(detalle)}
+                className="w-full text-sm text-forest border border-stone-200 hover:border-forest rounded-xl py-2 transition-colors"
+              >
+                Cambiar método de pago
+              </button>
+            )}
+
             {/* Acción anular */}
             {puedeSupervisar && detalle.estado !== 'ANULADA' && (
               <button
@@ -505,7 +564,99 @@ export default function VentasPage() {
       )}
 
       {verBitacora && <PanelBitacora fecha={hasta} onCerrar={() => setVerBitacora(false)} />}
+
+      {cambiandoPago && (
+        <ModalCambiarPago venta={cambiandoPago} onListo={onPagoCambiado} onCerrar={() => setCambiandoPago(null)} />
+      )}
     </div>
+  )
+}
+
+const METODOS_PAGO: MetodoPago[] = ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA']
+const ETIQUETA_METODO: Record<MetodoPago, string> = {
+  EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia',
+}
+
+/**
+ * Corrige cómo se pagó una venta ya cobrada. Pide motivo: mueve dinero entre
+ * el cajón y la terminal, y el corte de un turno ya cerrado no se rehace.
+ */
+function ModalCambiarPago({ venta, onListo, onCerrar }: {
+  venta: VentaResponse
+  onListo: (v: VentaResponse) => void
+  onCerrar: () => void
+}) {
+  const inicial = () => {
+    const m: Record<MetodoPago, string> = { EFECTIVO: '', TARJETA: '', TRANSFERENCIA: '' }
+    const pagos = venta.pagos?.length ? venta.pagos : [{ metodo: venta.metodoPago as MetodoPago, monto: venta.total }]
+    for (const pg of pagos) if (pg.metodo in m) m[pg.metodo] = String(pg.monto)
+    return m
+  }
+  const [montos, setMontos] = useState<Record<MetodoPago, string>>(inicial)
+  const [motivo, setMotivo] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  const pagos: PagoVenta[] = METODOS_PAGO
+    .map((m) => ({ metodo: m, monto: Math.round((parseFloat(montos[m]) || 0) * 100) / 100 }))
+    .filter((pg) => pg.monto > 0)
+  const falta = Math.round((venta.total - pagos.reduce((a, pg) => a + pg.monto, 0)) * 100) / 100
+  const cuadra = pagos.length > 0 && Math.abs(falta) < 0.01
+
+  /** Todo el total a un solo método: el caso más común. */
+  const todoA = (m: MetodoPago) =>
+    setMontos({ EFECTIVO: '', TARJETA: '', TRANSFERENCIA: '', [m]: String(venta.total) })
+
+  const guardar = async () => {
+    if (!cuadra) { setError(falta > 0 ? `Faltan ${fmt(falta)} para el total` : `Sobran ${fmt(-falta)}`); return }
+    if (!motivo.trim()) { setError('Explica por qué cambia el método de pago'); return }
+    setGuardando(true)
+    setError('')
+    try {
+      onListo(await cambiarPagosVenta(venta.id, pagos, motivo.trim()))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo cambiar el pago')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Modal title={`Cambiar pago · Venta #${venta.id}`} onClose={onCerrar} size="sm">
+      <div className="space-y-3">
+        <p className="text-sm text-stone-500">Total de la venta: <strong className="text-stone-800">{fmt(venta.total)}</strong></p>
+        <div className="flex gap-2">
+          {METODOS_PAGO.map((m) => (
+            <button key={m} onClick={() => todoA(m)}
+              className="flex-1 py-1.5 text-xs font-medium rounded-lg border border-stone-200 text-stone-600 hover:border-forest">
+              Todo {ETIQUETA_METODO[m].toLowerCase()}
+            </button>
+          ))}
+        </div>
+        {METODOS_PAGO.map((m) => (
+          <div key={m} className="flex items-center gap-2">
+            <span className="w-28 flex-shrink-0 text-xs text-stone-500">{ETIQUETA_METODO[m]}</span>
+            <input className="input text-sm py-1.5" type="number" min={0} step="0.5"
+              value={montos[m]} onChange={(e) => setMontos((prev) => ({ ...prev, [m]: e.target.value }))} />
+          </div>
+        ))}
+        {!cuadra && pagos.length > 0 && (
+          <p className="text-xs text-red-500">{falta > 0 ? `Faltan ${fmt(falta)}` : `Sobran ${fmt(-falta)}`}</p>
+        )}
+        <input className="input text-sm" maxLength={300} placeholder="Motivo (obligatorio)"
+          value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+        <p className="text-xs text-stone-400">
+          La comisión se recalcula con la tarifa con la que se cobró la venta. Si el turno ya se cerró, su corte no cambia.
+        </p>
+        {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button onClick={onCerrar} className="btn-secondary text-sm">Cancelar</button>
+          <button onClick={guardar} disabled={guardando} className="btn-primary text-sm">
+            {guardando ? 'Guardando…' : 'Guardar cambio'}
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 

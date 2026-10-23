@@ -25,12 +25,13 @@ import DesbloquearPage from './pages/DesbloquearPage'
 import CrearPinPage from './pages/CrearPinPage'
 import ActivarPinPage from './pages/ActivarPinPage'
 import CocinaPage from './pages/CocinaPage'
+import PantallaCarga from './components/PantallaCarga'
 
 function RequireAuth() {
   const { user, hayPin } = useAuth()
   if (user) return <Outlet />
   // Con PIN guardado se puede volver a entrar sin internet; el login normal no.
-  if (hayPin === null) return null // aún consultando IndexedDB
+  if (hayPin === null) return <PantallaCarga /> // aún consultando IndexedDB
   return <Navigate to={hayPin ? '/desbloquear' : '/login'} replace />
 }
 

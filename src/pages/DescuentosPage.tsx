@@ -8,6 +8,7 @@ import { listarProductos } from '../api/productos'
 import type { DescuentoView, DescuentoRequest, Categoria, ProductoDTO } from '../types/api'
 import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
+import { refrescarDescuentosAplicables } from '../db/precargaCatalogo'
 
 const fmt = (d: DescuentoView) =>
   d.tipo === 'PORCENTAJE' ? `${d.valor}%` : `$${d.valor}`
@@ -153,6 +154,8 @@ export default function DescuentosPage() {
       const updated = await listarDescuentos()
       setDescuentos(updated)
       setShowForm(false)
+      // Que la caja de este dispositivo lo vea sin esperar al siguiente turno
+      refrescarDescuentosAplicables().catch(() => {})
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : 'Error al guardar')
     } finally {
@@ -165,6 +168,7 @@ export default function DescuentosPage() {
     try {
       await eliminarDescuento(d.id)
       setDescuentos((prev) => prev.filter((x) => x.id !== d.id))
+      refrescarDescuentosAplicables().catch(() => {})
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al eliminar')
     }
