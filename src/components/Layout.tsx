@@ -306,7 +306,7 @@ export default function Layout() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="margen-gesto flex-1 overflow-hidden flex flex-col">
         {/* Header mobile/tablet con hamburguesa */}
         <header className="safe-top lg:hidden flex items-center gap-3 px-4 py-3 bg-forest-deep border-b border-white/10 flex-shrink-0">
           <button
