@@ -108,6 +108,7 @@ export default function EquilibrioPage() {
   const metaVentas = equilibrio?.metaVentas ?? 0
   const margenBruto = equilibrio?.margenBruto ?? 0
   const alcanzado = faltante === 0 && totalGastos > 0
+  const utilidadNeta = (equilibrio?.utilidadDelMes ?? 0) - totalGastos
 
   return (
     <div className="flex-1 overflow-y-auto p-6 max-w-3xl mx-auto w-full">
@@ -133,7 +134,9 @@ export default function EquilibrioPage() {
             <p className="text-sm text-stone-500">Meta de ventas</p>
             <p className="text-xl font-semibold text-stone-600 mt-0.5">{fmt(metaVentas)}</p>
             {totalGastos > 0 && margenBruto > 0 && (
-              <p className="text-xs text-stone-400 mt-0.5">{fmt(totalGastos)} ÷ {margenBruto.toFixed(1)}%</p>
+              <p className="text-xs text-stone-400 mt-0.5 max-w-[14rem] ml-auto">
+                Vendiendo esto, la utilidad cubre los {fmt(totalGastos)} de gastos fijos
+              </p>
             )}
           </div>
         </div>
@@ -183,7 +186,13 @@ export default function EquilibrioPage() {
             <div className="flex justify-between py-0.5"><span className="text-stone-500">− IVA</span><span className="text-stone-600">{fmt(equilibrio.ivaDelMes)}</span></div>
             <div className="flex justify-between py-0.5"><span className="text-stone-500">− Comisiones de tarjeta</span><span className="text-stone-600">{fmt(equilibrio.comisionesDelMes)}</span></div>
             <div className="flex justify-between py-0.5"><span className="text-stone-500">− Costo de lo vendido</span><span className="text-stone-600">{fmt(equilibrio.costoDelMes)}</span></div>
-            <div className="flex justify-between pt-1.5 mt-1 border-t border-stone-100 font-semibold"><span className="text-stone-700">Utilidad</span><span className="text-stone-800">{fmt(equilibrio.utilidadDelMes)}</span></div>
+            <div className="flex justify-between pt-1.5 mt-1 border-t border-stone-100 font-medium"><span className="text-stone-700">Utilidad</span><span className="text-stone-800">{fmt(equilibrio.utilidadDelMes)}</span></div>
+            {/* La pregunta de fondo del equilibrio: si la utilidad ya pagó los gastos fijos */}
+            <div className="flex justify-between py-0.5"><span className="text-stone-500">− Gastos fijos del mes</span><span className="text-stone-600">{fmt(totalGastos)}</span></div>
+            <div className="flex justify-between pt-1.5 mt-1 border-t border-stone-100 font-semibold">
+              <span className="text-stone-700">{utilidadNeta >= 0 ? 'Te queda' : 'Te falta para cubrir gastos'}</span>
+              <span className={utilidadNeta >= 0 ? 'text-emerald-700' : 'text-red-600'}>{fmt(Math.abs(utilidadNeta))}</span>
+            </div>
           </div>
         </>
       )}
