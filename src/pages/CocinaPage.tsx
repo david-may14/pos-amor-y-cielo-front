@@ -123,7 +123,9 @@ export default function CocinaPage() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      <header className="bg-forest-deep text-cream px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0">
+      {/* margen-gesto: no monta el Layout, así que el encabezado necesita su
+          propio margen para no quedar bajo la barra de estado de la tablet */}
+      <header className="margen-gesto safe-top bg-forest-deep text-cream px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-semibold">Cocina</h1>
           {sinConexion && (
@@ -132,8 +134,14 @@ export default function CocinaPage() {
             </span>
           )}
         </div>
-        <Link to="/login" className="text-xs text-cream/70 hover:text-cream underline">
-          Salir
+        <Link
+          to="/login"
+          className="flex items-center gap-2 text-sm font-medium text-cream border border-cream/30 hover:bg-white/10 rounded-lg px-4 py-2.5 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+          </svg>
+          Iniciar sesión
         </Link>
       </header>
 
