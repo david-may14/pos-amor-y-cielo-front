@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie'
-import type { DescuentoLibreRequest, ItemRequest, MetodoPago, PagoVenta, Rol } from '../types/api'
+import type {
+  DescuentoLibreRequest, ItemRequest, MetodoPago, PagoVenta, ReasignacionPropinaRequest, Rol,
+} from '../types/api'
 
 export interface VentaPendiente {
   clientId: string
@@ -10,6 +12,7 @@ export interface VentaPendiente {
   pagos?: PagoVenta[] | null
   descuentoLibre?: DescuentoLibreRequest | null
   atendioUsuarioId?: number | null
+  reasignacion?: ReasignacionPropinaRequest | null
   ocurrioEn: string
   creadoEn: string
   intentos: number

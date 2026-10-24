@@ -2,7 +2,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { offlineDb, type VentaPendiente } from './offlineDb'
 import { crearVenta } from '../api/ventas'
 import { esErrorDeRed } from '../api/client'
-import type { DescuentoLibreRequest, ItemRequest, MetodoPago, PagoVenta } from '../types/api'
+import type {
+  DescuentoLibreRequest, ItemRequest, MetodoPago, PagoVenta, ReasignacionPropinaRequest,
+} from '../types/api'
 
 export interface NuevaVentaPendiente {
   items: ItemRequest[]
@@ -13,6 +15,7 @@ export interface NuevaVentaPendiente {
   descuentoLibre?: DescuentoLibreRequest | null
   /** Se fija al cobrar: si la cola sube después, la venta sigue siendo de quien atendió. */
   atendioUsuarioId?: number | null
+  reasignacion?: ReasignacionPropinaRequest | null
 }
 
 /** Guarda una venta que no se pudo mandar al servidor por falta de conexión. */
@@ -47,7 +50,8 @@ export async function sincronizarPendientes(): Promise<{ sincronizadas: number; 
   for (const p of pendientes) {
     try {
       await crearVenta(p.items, p.metodoPago, p.descuentoTicketId, p.propina, null, p.clientId, p.ocurrioEn,
-        { pagos: p.pagos, descuentoLibre: p.descuentoLibre, atendioUsuarioId: p.atendioUsuarioId })
+        { pagos: p.pagos, descuentoLibre: p.descuentoLibre, atendioUsuarioId: p.atendioUsuarioId,
+          reasignacion: p.reasignacion })
       await offlineDb.ventasPendientes.delete(p.clientId)
       sincronizadas++
     } catch (e) {

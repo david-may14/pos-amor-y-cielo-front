@@ -384,6 +384,27 @@ export interface PropinaBaristaDTO {
   ventas: number
 }
 
+/** Un supervisor pasó la propina de una comanda a otra persona. */
+export interface ReasignacionPropinaRequest {
+  deUsuarioId: number | null
+  autorizoUsuarioId: number
+  comandaClientId?: string | null
+  comandaNombre?: string | null
+}
+
+export interface ReasignacionPropinaDTO {
+  id: number
+  ventaId: number
+  /** null si la comanda aún no ha subido al servidor. */
+  ticketId: number | null
+  comanda: string | null
+  de: string | null
+  para: string
+  autorizo: string
+  propina: number
+  ocurridoEn: string
+}
+
 /** Quien puede atender en caja (usuario activo con PIN). */
 export interface BaristaDTO {
   id: number

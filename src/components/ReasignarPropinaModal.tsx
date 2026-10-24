@@ -10,7 +10,8 @@ const LONGITUD = 6
 interface Props {
   /** Quien tiene la propina ahora. */
   actualId: number | null
-  onConfirm: (b: BaristaDTO) => void
+  /** A quién va la propina y qué supervisor lo autorizó. */
+  onConfirm: (para: BaristaDTO, autorizo: BaristaDTO) => void
   onClose: () => void
 }
 
@@ -20,7 +21,7 @@ interface Props {
  * quien atiende ya es supervisor, no se le vuelve a pedir.
  */
 export default function ReasignarPropinaModal({ actualId, onConfirm, onClose }: Props) {
-  const { baristas, autorizar, puedeAutorizar } = useBarista()
+  const { activo, baristas, autorizar, puedeAutorizar } = useBarista()
   const [destino, setDestino] = useState<BaristaDTO | null>(null)
   const [supervisor, setSupervisor] = useState<BaristaDTO | null>(null)
   const [pin, setPin] = useState('')
@@ -30,8 +31,8 @@ export default function ReasignarPropinaModal({ actualId, onConfirm, onClose }: 
   const supervisores = baristas.filter((b) => b.rol === 'ADMIN' || b.rol === 'SUPERVISOR')
 
   const elegirDestino = (b: BaristaDTO) => {
-    if (puedeAutorizar) {
-      onConfirm(b)
+    if (puedeAutorizar && activo) {
+      onConfirm(b, activo)
       onClose()
       return
     }
@@ -46,7 +47,7 @@ export default function ReasignarPropinaModal({ actualId, onConfirm, onClose }: 
     autorizar(supervisor, pin)
       .then(() => {
         if (cancelado) return
-        onConfirm(destino)
+        onConfirm(destino, supervisor)
         onClose()
       })
       .catch((e: unknown) => {

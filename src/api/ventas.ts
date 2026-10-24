@@ -2,6 +2,7 @@ import { api } from './client'
 import type {
   VentaResponse, ResumenDia, ResumenPeriodo, ItemRequest,
   MotivoAnulacion, AnulacionDTO, PagoVenta, DescuentoLibreRequest, CambioPagoDTO,
+  ReasignacionPropinaRequest, ReasignacionPropinaDTO,
 } from '../types/api'
 
 /** Lo que una venta puede llevar además de lo básico. */
@@ -11,6 +12,8 @@ export interface ExtrasVenta {
   descuentoLibre?: DescuentoLibreRequest | null
   /** El barista que atendió; a él van la venta y la propina. */
   atendioUsuarioId?: number | null
+  /** Si un supervisor pasó la propina de la comanda: queda en la bitácora. */
+  reasignacion?: ReasignacionPropinaRequest | null
 }
 
 export const reportePeriodo = (desde: string, hasta: string) =>
@@ -65,7 +68,11 @@ export const crearVenta = (
   ...(extras?.pagos?.length ? { pagos: extras.pagos } : {}),
   ...(extras?.descuentoLibre ? { descuentoLibre: extras.descuentoLibre } : {}),
   ...(extras?.atendioUsuarioId ? { atendioUsuarioId: extras.atendioUsuarioId } : {}),
+  ...(extras?.reasignacion ? { reasignacion: extras.reasignacion } : {}),
 })
+
+export const listarReasignacionesPropina = (desde: string, hasta: string) =>
+  api.get<ReasignacionPropinaDTO[]>(`/api/ventas/reasignaciones-propina?desde=${desde}&hasta=${hasta}`)
 
 /** Corrige cómo se pagó una venta ya cobrada. Queda en bitácora con el motivo. */
 export const cambiarPagosVenta = (id: number, pagos: PagoVenta[], motivo: string) =>

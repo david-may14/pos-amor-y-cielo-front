@@ -180,7 +180,7 @@ export default function POSPage() {
   const [ticketActivo, setTicketActivo] = useState<TicketLocal | null>(null)
   const { nombreActivo, atendioUsuarioId, baristas, abrirSelector } = useBarista()
   // Un supervisor puede pasar la propina de la comanda a otra persona.
-  const [propinaPara, setPropinaPara] = useState<{ id: number; nombre: string } | null>(null)
+  const [propinaPara, setPropinaPara] = useState<{ id: number; nombre: string; autorizoId: number } | null>(null)
   const [showReasignar, setShowReasignar] = useState(false)
   useEffect(() => { setPropinaPara(null) }, [ticketActivo?.clientId])
   // La propina de una comanda es de quien la tomó, aunque la cobre otro.
@@ -586,7 +586,15 @@ export default function POSPage() {
       const propinaFinal = propinaNum > 0 ? propinaNum : 0
       const pagos = pagoMixto ? pagosMixtos : null
       const metodoBase: MetodoPago = pagos ? pagos[0].metodo : metodoPago
-      const extras = { pagos, descuentoLibre, atendioUsuarioId: atendioCobro }
+      const reasignacion = propinaPara && ticketActivo
+        ? {
+            deUsuarioId: ticketActivo.atendioUsuarioId ?? null,
+            autorizoUsuarioId: propinaPara.autorizoId,
+            comandaClientId: ticketActivo.clientId,
+            comandaNombre: ticketActivo.nombre,
+          }
+        : null
+      const extras = { pagos, descuentoLibre, atendioUsuarioId: atendioCobro, reasignacion }
 
       // Cobrar una comanda es cobrar sus items: se registra la venta igual que
       // una normal y la comanda se marca como cobrada en el dispositivo. Así el
@@ -949,7 +957,7 @@ export default function POSPage() {
         {showReasignar && (
           <ReasignarPropinaModal
             actualId={atendioCobro}
-            onConfirm={(b) => setPropinaPara({ id: b.id, nombre: b.nombre })}
+            onConfirm={(b, autorizo) => setPropinaPara({ id: b.id, nombre: b.nombre, autorizoId: autorizo.id })}
             onClose={() => setShowReasignar(false)}
           />
         )}
