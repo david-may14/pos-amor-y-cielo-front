@@ -185,6 +185,14 @@ export default function POSPage() {
   useEffect(() => { setPropinaPara(null) }, [ticketActivo?.clientId])
   // La propina de una comanda es de quien la tomó, aunque la cobre otro.
   const atendioCobro = propinaPara?.id ?? ticketActivo?.atendioUsuarioId ?? atendioUsuarioId
+  // Con la sesión de un admin, nadie ha elegido quién atiende: la venta y la
+  // propina caerían en el admin. Se pide antes de cobrar o guardar.
+  const faltaQuienAtiende = (paraCobro: boolean) =>
+    user?.rol === 'ADMIN' && (paraCobro ? atendioCobro : atendioUsuarioId) == null
+  const pedirQuienAtiende = () => {
+    setError('Elige quién atiende antes de continuar.')
+    abrirSelector()
+  }
   const nombrePropina = propinaPara?.nombre
     ?? (ticketActivo?.atendioUsuarioId != null
       ? baristas.find((b) => b.id === ticketActivo.atendioUsuarioId)?.nombre ?? null
@@ -297,6 +305,7 @@ export default function POSPage() {
   }))
 
   const abrirGuardarTicket = () => {
+    if (!ticketActivo && faltaQuienAtiende(false)) { pedirQuienAtiende(); return }
     setNombreTicketInput(ticketActivo?.nombre ?? '')
     setShowGuardarTicket(true)
   }
@@ -565,6 +574,7 @@ export default function POSPage() {
       setError('Abre el turno en la pestaña "Turno" antes de cobrar.')
       return
     }
+    if (faltaQuienAtiende(true)) { pedirQuienAtiende(); return }
     if (pagoMixto && !mixtoCuadra) {
       setError(faltaMixto > 0
         ? `Los pagos no cubren el total: faltan ${fmt(faltaMixto)}.`
@@ -1315,7 +1325,10 @@ export default function POSPage() {
 
           <div className="flex gap-2">
             <button
-              onClick={() => { setShowSplit(true); setError('') }}
+              onClick={() => {
+                if (faltaQuienAtiende(false)) { pedirQuienAtiende(); return }
+                setShowSplit(true); setError('')
+              }}
               disabled={cart.length === 0 || submitting || !!ticketActivo}
               className="flex-shrink-0 py-3 px-3 rounded-xl border-2 border-stone-200 text-stone-500 hover:border-forest hover:text-forest disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title={ticketActivo ? 'No disponible en modo ticket' : 'Dividir cuenta'}

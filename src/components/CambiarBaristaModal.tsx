@@ -19,7 +19,9 @@ function iniciales(nombre: string): string {
  */
 export default function CambiarBaristaModal({ onClose }: { onClose: () => void }) {
   const { user } = useAuth()
-  const { activo, baristas, cambiar, volverASesion } = useBarista()
+  const { activo, baristas: todos, cambiar, volverASesion } = useBarista()
+  // Un admin no atiende: para la barra cada quien usa su cuenta de barista o supervisor.
+  const baristas = todos.filter((b) => b.rol !== 'ADMIN')
   const [elegido, setElegido] = useState<BaristaDTO | null>(null)
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
@@ -54,7 +56,8 @@ export default function CambiarBaristaModal({ onClose }: { onClose: () => void }
         <div className="space-y-3">
           {baristas.length === 0 ? (
             <p className="text-sm text-stone-500 text-center py-6">
-              Nadie tiene PIN todavía. Cada barista lo crea al iniciar sesión una vez.
+              Nadie puede atender todavía. Cada barista o supervisor crea su PIN al iniciar sesión una vez;
+              los administradores no atienden en caja.
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-2">
@@ -80,7 +83,7 @@ export default function CambiarBaristaModal({ onClose }: { onClose: () => void }
               })}
             </div>
           )}
-          {activo && (
+          {activo && user?.rol !== 'ADMIN' && (
             <button
               onClick={() => { volverASesion(); onClose() }}
               className="w-full text-xs text-stone-400 hover:text-stone-600 pt-2"
