@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { TurnoProvider } from './contexts/TurnoContext'
+import { BaristaProvider } from './contexts/BaristaContext'
 import App from './App'
 import { isAndroidApp } from './services/printer/androidBridge'
 import './index.css'
@@ -14,9 +15,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <TurnoProvider>
-          <App />
-        </TurnoProvider>
+        <BaristaProvider>
+          <TurnoProvider>
+            <App />
+          </TurnoProvider>
+        </BaristaProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>

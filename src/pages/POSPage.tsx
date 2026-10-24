@@ -16,6 +16,7 @@ import { isPrinterAvailable } from '../services/printer/connection'
 import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
 import { useTurno } from '../contexts/TurnoContext'
+import { useBarista } from '../contexts/BaristaContext'
 import { esErrorDeRed } from '../api/client'
 import { encolarVenta } from '../db/offlineSales'
 import type {
@@ -26,6 +27,7 @@ import Modal from '../components/Modal'
 import Spinner from '../components/Spinner'
 import PantallaCarga from '../components/PantallaCarga'
 import SplitCuentaModal from '../components/SplitCuentaModal'
+import ReasignarPropinaModal from '../components/ReasignarPropinaModal'
 
 interface CartMod {
   opcionId: number
@@ -176,6 +178,18 @@ export default function POSPage() {
 
   // Ticket activo (modo edición)
   const [ticketActivo, setTicketActivo] = useState<TicketLocal | null>(null)
+  const { nombreActivo, atendioUsuarioId, baristas, abrirSelector } = useBarista()
+  // Un supervisor puede pasar la propina de la comanda a otra persona.
+  const [propinaPara, setPropinaPara] = useState<{ id: number; nombre: string; autorizoId: number } | null>(null)
+  const [showReasignar, setShowReasignar] = useState(false)
+  useEffect(() => { setPropinaPara(null) }, [ticketActivo?.clientId])
+  // La propina de una comanda es de quien la tomó, aunque la cobre otro.
+  const atendioCobro = propinaPara?.id ?? ticketActivo?.atendioUsuarioId ?? atendioUsuarioId
+  const nombrePropina = propinaPara?.nombre
+    ?? (ticketActivo?.atendioUsuarioId != null
+      ? baristas.find((b) => b.id === ticketActivo.atendioUsuarioId)?.nombre ?? null
+      : null)
+    ?? nombreActivo
   const [showGuardarTicket, setShowGuardarTicket] = useState(false)
   const [nombreTicketInput, setNombreTicketInput] = useState('')
   const [savingTicket, setSavingTicket] = useState(false)
@@ -331,7 +345,7 @@ export default function POSPage() {
         const t = await obtenerTicketLocal(ticketActivo.clientId)
         if (t) setTicketActivo(t)
       } else {
-        const creada = await crearTicketLocal(nombre, items)
+        const creada = await crearTicketLocal(nombre, items, atendioUsuarioId)
         await respaldarEnPapelSiNoLlego(creada)
         clearCart()
         setTicketActivo(null)
@@ -572,7 +586,15 @@ export default function POSPage() {
       const propinaFinal = propinaNum > 0 ? propinaNum : 0
       const pagos = pagoMixto ? pagosMixtos : null
       const metodoBase: MetodoPago = pagos ? pagos[0].metodo : metodoPago
-      const extras = { pagos, descuentoLibre }
+      const reasignacion = propinaPara && ticketActivo
+        ? {
+            deUsuarioId: ticketActivo.atendioUsuarioId ?? null,
+            autorizoUsuarioId: propinaPara.autorizoId,
+            comandaClientId: ticketActivo.clientId,
+            comandaNombre: ticketActivo.nombre,
+          }
+        : null
+      const extras = { pagos, descuentoLibre, atendioUsuarioId: atendioCobro, reasignacion }
 
       // Cobrar una comanda es cobrar sus items: se registra la venta igual que
       // una normal y la comanda se marca como cobrada en el dispositivo. Así el
@@ -907,6 +929,38 @@ export default function POSPage() {
             )}
           </div>
         </div>
+
+        <div className="flex items-center justify-between gap-2 px-5 py-2 border-b border-stone-100 text-xs">
+          <span className="truncate text-stone-500">
+            Atiende: <span className="font-semibold text-stone-800">{nombreActivo}</span>
+            {ticketActivo && (
+              <>
+                {' · '}
+                <button
+                  onClick={() => setShowReasignar(true)}
+                  className="text-amber-700 underline decoration-dotted hover:text-amber-800"
+                  title="Pasar la propina a otra persona (autoriza un supervisor)"
+                >
+                  propina para {nombrePropina}
+                </button>
+              </>
+            )}
+          </span>
+          <button
+            onClick={abrirSelector}
+            className="flex-shrink-0 font-medium text-forest hover:underline"
+            title="Pasar la caja a otro barista con su PIN"
+          >
+            Cambiar
+          </button>
+        </div>
+        {showReasignar && (
+          <ReasignarPropinaModal
+            actualId={atendioCobro}
+            onConfirm={(b, autorizo) => setPropinaPara({ id: b.id, nombre: b.nombre, autorizoId: autorizo.id })}
+            onClose={() => setShowReasignar(false)}
+          />
+        )}
 
         {ticketActivo && (
           <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 text-xs">

@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie'
-import type { DescuentoLibreRequest, ItemRequest, MetodoPago, PagoVenta, Rol } from '../types/api'
+import type {
+  DescuentoLibreRequest, ItemRequest, MetodoPago, PagoVenta, ReasignacionPropinaRequest, Rol,
+} from '../types/api'
 
 export interface VentaPendiente {
   clientId: string
@@ -9,6 +11,8 @@ export interface VentaPendiente {
   propina: number
   pagos?: PagoVenta[] | null
   descuentoLibre?: DescuentoLibreRequest | null
+  atendioUsuarioId?: number | null
+  reasignacion?: ReasignacionPropinaRequest | null
   ocurrioEn: string
   creadoEn: string
   intentos: number
@@ -63,6 +67,8 @@ export interface TicketLocal {
   actualizadoEn: string
   /** Si se cobró sin conexión, la venta encolada a la que corresponde. */
   ventaClientId?: string
+  /** Quien tomó la orden: al cobrarla, la propina es suya. */
+  atendioUsuarioId?: number | null
   /** true mientras el servidor no tenga esta versión. */
   pendiente: boolean
   ultimoError?: string

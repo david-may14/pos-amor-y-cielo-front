@@ -7,7 +7,7 @@ import VentasPage from './pages/VentasPage'
 import ProductosPage from './pages/ProductosPage'
 import IngredientesPage from './pages/IngredientesPage'
 import InventarioPage from './pages/InventarioPage'
-import UsuariosPage from './pages/UsuariosPage'
+import EquipoPage from './pages/EquipoPage'
 import ModificadoresPage from './pages/ModificadoresPage'
 import CategoriasPage from './pages/CategoriasPage'
 import DescuentosPage from './pages/DescuentosPage'
@@ -82,7 +82,8 @@ export default function App() {
             <Route path="/insumos" element={<InsumosPage />} />
             <Route path="/ingredientes" element={<Navigate to="/insumos" replace />} />
             <Route path="/plantillas" element={<Navigate to="/insumos" replace />} />
-            <Route path="/usuarios" element={<UsuariosPage />} />
+            <Route path="/equipo" element={<EquipoPage />} />
+            <Route path="/usuarios" element={<Navigate to="/equipo" replace />} />
             <Route path="/modificadores" element={<ModificadoresPage />} />
             <Route path="/categorias" element={<CategoriasPage />} />
             <Route path="/descuentos" element={<DescuentosPage />} />

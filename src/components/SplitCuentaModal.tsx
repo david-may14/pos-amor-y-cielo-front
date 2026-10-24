@@ -12,6 +12,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+import { useBarista } from '../contexts/BaristaContext'
 import { crearVenta, anularVenta } from '../api/ventas'
 import { isPrinterAvailable } from '../services/printer/connection'
 import { abrirCajon } from '../services/printer/cajon'
@@ -249,6 +250,7 @@ function CuentaControls({ cuenta, subtotal, hasItems, pagada, procesando, anulan
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
+  const { atendioUsuarioId } = useBarista()
   const [phase, setPhase] = useState<'choose' | 'split'>('choose')
   const [numPartes, setNumPartes] = useState(2)
   const [cuentas, setCuentas] = useState<Cuenta[]>([])
@@ -387,6 +389,8 @@ export default function SplitCuentaModal({ cart, onConfirm, onClose }: Props) {
         buildItems(c.id), c.metodoPago, null,
         propina > 0 ? propina : undefined,
         splitId,
+        undefined, undefined,
+        { atendioUsuarioId },
       )
       if (c.metodoPago === 'EFECTIVO' && isPrinterAvailable()) {
         abrirCajon().catch(() => { /* no bloquea la venta si el cajón no responde */ })
