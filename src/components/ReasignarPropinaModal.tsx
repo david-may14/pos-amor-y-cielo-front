@@ -83,7 +83,7 @@ export default function ReasignarPropinaModal({ actualId, onConfirm, onClose }: 
   return (
     <Modal title={titulo} onClose={onClose} size="sm">
       {!destino ? (
-        lista(baristas, elegirDestino, actualId)
+        lista(baristas.filter((b) => b.rol !== 'ADMIN'), elegirDestino, actualId)
       ) : !supervisor ? (
         <div className="space-y-3">
           <p className="text-sm text-stone-500">La propina pasará a <b>{destino.nombre}</b>.</p>

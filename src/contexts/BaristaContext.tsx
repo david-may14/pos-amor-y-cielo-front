@@ -31,7 +31,11 @@ const BaristaContext = createContext<BaristaContextValue | null>(null)
 
 export function BaristaProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  const [activo, setActivo] = useState<BaristaDTO | null>(() => getBaristaActivo())
+  // Un admin guardado de una versión anterior no cuenta: los admin no atienden.
+  const [activo, setActivo] = useState<BaristaDTO | null>(() => {
+    const b = getBaristaActivo()
+    return b && b.rol !== 'ADMIN' ? b : null
+  })
   const [baristas, setBaristas] = useState<BaristaDTO[]>(() => getBaristasGuardados())
   const [selectorAbierto, setSelectorAbierto] = useState(false)
 
