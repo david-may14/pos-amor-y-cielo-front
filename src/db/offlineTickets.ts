@@ -22,11 +22,13 @@ export function totalDeItems(items: TicketItemLocal[]): number {
 export async function crearTicketLocal(
   nombre: string | null,
   items: TicketItemLocal[],
+  atendioUsuarioId: number | null = null,
 ): Promise<TicketLocal> {
   const ahora = new Date().toISOString()
   const ticket: TicketLocal = {
     clientId: crypto.randomUUID(),
     servidorId: null,
+    atendioUsuarioId,
     nombre,
     estado: 'ABIERTO',
     items,
@@ -122,6 +124,7 @@ function desdeServidor(t: TicketResponse): TicketLocal | null {
   return {
     clientId: t.clientId,
     servidorId: t.id,
+    atendioUsuarioId: t.usuarioId ?? null,
     nombre: t.nombre ?? null,
     estado: t.estado as TicketLocal['estado'],
     items: t.items.map((i) => ({
@@ -168,6 +171,7 @@ export async function sincronizarTickets(): Promise<{ subidas: number; bajadas: 
         actualizadoEn: t.actualizadoEn,
         ventaClientId: t.ventaClientId,
         items: t.items,
+        atendioUsuarioId: t.atendioUsuarioId ?? null,
       })
       await offlineDb.tickets.update(t.clientId, {
         servidorId: remoto.id,

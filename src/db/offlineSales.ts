@@ -11,6 +11,8 @@ export interface NuevaVentaPendiente {
   propina: number
   pagos?: PagoVenta[] | null
   descuentoLibre?: DescuentoLibreRequest | null
+  /** Se fija al cobrar: si la cola sube después, la venta sigue siendo de quien atendió. */
+  atendioUsuarioId?: number | null
 }
 
 /** Guarda una venta que no se pudo mandar al servidor por falta de conexión. */
@@ -45,7 +47,7 @@ export async function sincronizarPendientes(): Promise<{ sincronizadas: number; 
   for (const p of pendientes) {
     try {
       await crearVenta(p.items, p.metodoPago, p.descuentoTicketId, p.propina, null, p.clientId, p.ocurrioEn,
-        { pagos: p.pagos, descuentoLibre: p.descuentoLibre })
+        { pagos: p.pagos, descuentoLibre: p.descuentoLibre, atendioUsuarioId: p.atendioUsuarioId })
       await offlineDb.ventasPendientes.delete(p.clientId)
       sincronizadas++
     } catch (e) {

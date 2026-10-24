@@ -371,6 +371,24 @@ export interface TurnoDTO {
   ventasTotalActual: number | null
   ventasCountActual: number | null
   movimientos: MovimientoCajaDTO[]
+  /** Solo en el turno abierto y al cerrar: la propina de cada quien. */
+  propinasPorBarista: PropinaBaristaDTO[] | null
+}
+
+export interface PropinaBaristaDTO {
+  usuarioId: number
+  nombre: string
+  propinaEfectivo: number
+  propinaTarjeta: number
+  total: number
+  ventas: number
+}
+
+/** Quien puede atender en caja (usuario activo con PIN). */
+export interface BaristaDTO {
+  id: number
+  nombre: string
+  rol: Rol
 }
 
 // ─── Cierre mensual ─────────────────────────────────────────────────────────
@@ -571,6 +589,8 @@ export interface CrearTicketRequest {
   /** Generado por el dispositivo; permite reenviar sin duplicar. */
   clientId?: string
   items: TicketItemRequest[]
+  /** Quien tomó la orden; si falta, el usuario de la sesión. */
+  atendioUsuarioId?: number | null
 }
 /** Estado completo de una comanda editada sin conexión. */
 export interface SincronizarTicketRequest {
@@ -580,6 +600,7 @@ export interface SincronizarTicketRequest {
   actualizadoEn: string
   ventaClientId?: string
   items: TicketItemRequest[]
+  atendioUsuarioId?: number | null
 }
 export interface TicketModificadorResponse {
   opcionId: number
@@ -600,6 +621,8 @@ export interface TicketResponse {
   id: number
   /** Identificador del dispositivo; casa con la copia local. */
   clientId: string | null
+  /** Quien tomó la orden. */
+  usuarioId: number | null
   nombre: string | null
   estado: 'ABIERTO' | 'COBRADO' | 'CANCELADO'
   ventaId: number | null
@@ -613,6 +636,7 @@ export interface CobrarTicketRequest {
   metodoPago: string
   descuentoTicketId?: number | null
   propina?: number
+  atendioUsuarioId?: number | null
 }
 
 // ── Pantalla de cocina ───────────────────────────────────────────────────────

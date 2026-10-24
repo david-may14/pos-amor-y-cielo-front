@@ -9,6 +9,8 @@ export interface ExtrasVenta {
   /** Cobro repartido entre métodos; tiene que sumar el total. */
   pagos?: PagoVenta[] | null
   descuentoLibre?: DescuentoLibreRequest | null
+  /** El barista que atendió; a él van la venta y la propina. */
+  atendioUsuarioId?: number | null
 }
 
 export const reportePeriodo = (desde: string, hasta: string) =>
@@ -62,6 +64,7 @@ export const crearVenta = (
   ...(ocurrioEn ? { ocurrioEn } : {}),
   ...(extras?.pagos?.length ? { pagos: extras.pagos } : {}),
   ...(extras?.descuentoLibre ? { descuentoLibre: extras.descuentoLibre } : {}),
+  ...(extras?.atendioUsuarioId ? { atendioUsuarioId: extras.atendioUsuarioId } : {}),
 })
 
 /** Corrige cómo se pagó una venta ya cobrada. Queda en bitácora con el motivo. */

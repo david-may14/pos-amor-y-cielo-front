@@ -293,6 +293,26 @@ export default function CajaPage() {
             )}
           </div>
 
+          {/* Propinas por barista: de quien atendió cada venta */}
+          {(turnoActivo.propinasPorBarista?.length ?? 0) > 0 && (
+            <div className="card px-5 py-4">
+              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-3">Propinas por barista</p>
+              <div className="space-y-2">
+                {turnoActivo.propinasPorBarista!.map((p) => (
+                  <div key={p.usuarioId} className="flex items-center justify-between text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium text-stone-700 truncate">{p.nombre}</p>
+                      <p className="text-xs text-stone-400">
+                        {p.ventas} venta{p.ventas !== 1 ? 's' : ''} · efectivo {fmt(p.propinaEfectivo)} · tarjeta {fmt(p.propinaTarjeta)}
+                      </p>
+                    </div>
+                    <span className="font-semibold text-stone-800">{fmt(p.total)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Lista de movimientos */}
           {turnoActivo.movimientos.length > 0 && (
             <div className="card px-5 py-4">

@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { BaristaDTO } from '../types/api'
 
 /**
  * PIN del usuario, guardado en el servidor como hash bcrypt. Es el mismo en
@@ -13,6 +14,17 @@ export const definirPin = (password: string, pin: string) =>
 /** Elimina el PIN propio: ese usuario dejará de poder entrar sin internet. */
 export const quitarPin = (password: string) =>
   api.delete<null>('/api/auth/pin', { password })
+
+/** Quienes pueden atender en caja: usuarios activos con PIN. */
+export const listarBaristas = () =>
+  api.get<BaristaDTO[]>('/api/auth/pin/baristas')
+
+/**
+ * Pasa la caja a otro barista con su PIN, sin cerrar la sesión del equipo.
+ * Desde ahí las ventas y propinas quedan a su nombre.
+ */
+export const cambiarBarista = (usuarioId: number, pin: string) =>
+  api.post<BaristaDTO>('/api/auth/pin/cambiar', { usuarioId, pin })
 
 /** Comprueba contra el servidor que el PIN tecleado es el correcto. */
 export const verificarPin = (pin: string) =>

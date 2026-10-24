@@ -9,6 +9,7 @@ import {
   borrarPin, configurarPin, desbloquearConPin, tienePin,
   type ResultadoDesbloqueo,
 } from '../db/pinSesion'
+import { olvidarBaristas } from '../db/baristaActivo'
 import type { Rol } from '../types/api'
 
 interface AuthUser {
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await revocarSesionRemota()
     await borrarPin().catch(() => {})
+    olvidarBaristas()
     limpiarSesion()
     setUser(null)
     setHayPin(false)

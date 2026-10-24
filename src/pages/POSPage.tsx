@@ -16,6 +16,7 @@ import { isPrinterAvailable } from '../services/printer/connection'
 import { abrirCajon } from '../services/printer/cajon'
 import { useAuth } from '../contexts/AuthContext'
 import { useTurno } from '../contexts/TurnoContext'
+import { useBarista } from '../contexts/BaristaContext'
 import { esErrorDeRed } from '../api/client'
 import { encolarVenta } from '../db/offlineSales'
 import type {
@@ -176,6 +177,13 @@ export default function POSPage() {
 
   // Ticket activo (modo edición)
   const [ticketActivo, setTicketActivo] = useState<TicketLocal | null>(null)
+  const { nombreActivo, atendioUsuarioId, baristas, abrirSelector } = useBarista()
+  // La propina de una comanda es de quien la tomó, aunque la cobre otro.
+  const atendioCobro = ticketActivo?.atendioUsuarioId ?? atendioUsuarioId
+  const tomoLaOrden = ticketActivo?.atendioUsuarioId != null
+      && ticketActivo.atendioUsuarioId !== atendioUsuarioId
+    ? baristas.find((b) => b.id === ticketActivo.atendioUsuarioId)?.nombre ?? null
+    : null
   const [showGuardarTicket, setShowGuardarTicket] = useState(false)
   const [nombreTicketInput, setNombreTicketInput] = useState('')
   const [savingTicket, setSavingTicket] = useState(false)
@@ -331,7 +339,7 @@ export default function POSPage() {
         const t = await obtenerTicketLocal(ticketActivo.clientId)
         if (t) setTicketActivo(t)
       } else {
-        const creada = await crearTicketLocal(nombre, items)
+        const creada = await crearTicketLocal(nombre, items, atendioUsuarioId)
         await respaldarEnPapelSiNoLlego(creada)
         clearCart()
         setTicketActivo(null)
@@ -572,7 +580,7 @@ export default function POSPage() {
       const propinaFinal = propinaNum > 0 ? propinaNum : 0
       const pagos = pagoMixto ? pagosMixtos : null
       const metodoBase: MetodoPago = pagos ? pagos[0].metodo : metodoPago
-      const extras = { pagos, descuentoLibre }
+      const extras = { pagos, descuentoLibre, atendioUsuarioId: atendioCobro }
 
       // Cobrar una comanda es cobrar sus items: se registra la venta igual que
       // una normal y la comanda se marca como cobrada en el dispositivo. Así el
@@ -907,6 +915,18 @@ export default function POSPage() {
             )}
           </div>
         </div>
+
+        <button
+          onClick={abrirSelector}
+          className="w-full flex items-center justify-between gap-2 px-5 py-2 border-b border-stone-100 text-xs hover:bg-stone-50 transition-colors"
+          title="Pasar la caja a otro barista con su PIN"
+        >
+          <span className="truncate text-stone-500">
+            Atiende: <span className="font-semibold text-stone-800">{nombreActivo}</span>
+            {tomoLaOrden && <span className="text-amber-700"> · propina para {tomoLaOrden}</span>}
+          </span>
+          <span className="flex-shrink-0 font-medium text-forest">Cambiar</span>
+        </button>
 
         {ticketActivo && (
           <div className="px-5 py-2.5 bg-amber-50 border-b border-amber-100 text-xs">
