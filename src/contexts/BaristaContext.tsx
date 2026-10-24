@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useAuth } from './AuthContext'
-import { cambiarBarista, listarBaristas } from '../api/pin'
+import { autorizarSupervisor, cambiarBarista, listarBaristas } from '../api/pin'
 import { esErrorDeRed } from '../api/errores'
 import {
   getBaristaActivo, setBaristaActivo, getBaristasGuardados, guardarBaristas,
@@ -19,6 +19,10 @@ interface BaristaContextValue {
   baristas: BaristaDTO[]
   /** Valida el PIN (con el servidor, o en el equipo si no hay red) y pasa la caja. */
   cambiar: (b: BaristaDTO, pin: string) => Promise<void>
+  /** Comprueba el PIN de un supervisor o admin. Lanza si no es válido. */
+  autorizar: (b: BaristaDTO, pin: string) => Promise<void>
+  /** Si quien atiende ya es supervisor o admin y no hace falta pedir PIN. */
+  puedeAutorizar: boolean
   volverASesion: () => void
   abrirSelector: () => void
 }
@@ -56,19 +60,35 @@ export function BaristaProvider({ children }: { children: ReactNode }) {
     setBaristaActivo(b)
   }, [])
 
-  const cambiar = useCallback(async (b: BaristaDTO, pin: string) => {
+  /** Valida con el servidor; sin red, contra lo que recuerda el equipo. */
+  const comprobar = useCallback(async (
+    b: BaristaDTO, pin: string, enServidor: (id: number, pin: string) => Promise<BaristaDTO>,
+  ): Promise<BaristaDTO> => {
     try {
-      const confirmado = await cambiarBarista(b.id, pin)
+      const confirmado = await enServidor(b.id, pin)
       await recordarPin(b.id, pin)
-      fijar(confirmado)
+      return confirmado
     } catch (e) {
       if (!esErrorDeRed(e)) throw e
       const local = await verificarPinLocal(b.id, pin)
-      if (local === 'ok') { fijar(b); return }
+      if (local === 'ok') return b
       if (local === 'incorrecto') throw new Error('PIN incorrecto')
       throw new Error(`Sin conexión: ${b.nombre} tiene que entrar una vez con internet en este equipo.`)
     }
-  }, [fijar])
+  }, [])
+
+  const cambiar = useCallback(async (b: BaristaDTO, pin: string) => {
+    fijar(await comprobar(b, pin, cambiarBarista))
+  }, [comprobar, fijar])
+
+  const autorizar = useCallback(async (b: BaristaDTO, pin: string) => {
+    if (b.rol === 'BARISTA') throw new Error('Solo un supervisor puede autorizarlo')
+    await comprobar(b, pin, autorizarSupervisor)
+  }, [comprobar])
+
+  // Solo cuenta quien entró con su PIN: la sesión del equipo puede ser de un
+  // admin y la estaría usando cualquiera.
+  const rolActivo = activo?.rol
 
   const volverASesion = useCallback(() => fijar(null), [fijar])
 
@@ -83,7 +103,9 @@ export function BaristaProvider({ children }: { children: ReactNode }) {
       nombreActivo: activo?.nombre ?? user?.nombre ?? '',
       atendioUsuarioId: activo?.id ?? null,
       baristas,
-      cambiar, volverASesion, abrirSelector,
+      cambiar, autorizar,
+      puedeAutorizar: rolActivo === 'ADMIN' || rolActivo === 'SUPERVISOR',
+      volverASesion, abrirSelector,
     }}>
       {children}
       {selectorAbierto && <CambiarBaristaModal onClose={() => setSelectorAbierto(false)} />}

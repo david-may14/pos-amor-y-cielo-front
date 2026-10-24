@@ -26,6 +26,10 @@ export const listarBaristas = () =>
 export const cambiarBarista = (usuarioId: number, pin: string) =>
   api.post<BaristaDTO>('/api/auth/pin/cambiar', { usuarioId, pin })
 
+/** Un supervisor o admin autoriza con su PIN algo que el barista no puede solo. */
+export const autorizarSupervisor = (usuarioId: number, pin: string) =>
+  api.post<BaristaDTO>('/api/auth/pin/autorizar', { usuarioId, pin })
+
 /** Comprueba contra el servidor que el PIN tecleado es el correcto. */
 export const verificarPin = (pin: string) =>
   api.post<null>('/api/auth/pin/verificar', { pin })
