@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import UsuariosPage from './UsuariosPage'
 import Spinner from '../components/Spinner'
+import PropinasEquipo from '../components/PropinasEquipo'
 import { listarReasignacionesPropina } from '../api/ventas'
 import { hoy, primerDiaDelMes } from '../utils/fecha'
 import type { ReasignacionPropinaDTO } from '../types/api'
@@ -8,10 +9,11 @@ import type { ReasignacionPropinaDTO } from '../types/api'
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n)
 
-type Seccion = 'personas' | 'reasignaciones'
+type Seccion = 'personas' | 'propinas' | 'reasignaciones'
 
 const SECCIONES: { id: Seccion; label: string }[] = [
   { id: 'personas', label: 'Personas' },
+  { id: 'propinas', label: 'Propinas' },
   { id: 'reasignaciones', label: 'Propinas reasignadas' },
 ]
 
@@ -36,7 +38,9 @@ export default function EquipoPage() {
           </button>
         ))}
       </div>
-      {seccion === 'personas' ? <UsuariosPage /> : <ReasignacionesPropina />}
+      {seccion === 'personas' && <UsuariosPage />}
+      {seccion === 'propinas' && <PropinasEquipo />}
+      {seccion === 'reasignaciones' && <ReasignacionesPropina />}
     </div>
   )
 }
