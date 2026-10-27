@@ -38,6 +38,24 @@ interface ProductoForm {
 
 const emptyForm: ProductoForm = { nombre: '', precioVenta: '', costo: '', categoriaId: '', margenSeguridad: '' }
 
+type Estatus = 'sin_receta' | 'revisar' | 'ok'
+type EstatusFiltro = 'todos' | 'sin_receta' | 'revisar'
+
+const estatusDe = (p: ProductoDTO): Estatus =>
+  !p.tieneReceta ? 'sin_receta' : p.recetaVencida ? 'revisar' : 'ok'
+
+const siguienteFiltro: Record<EstatusFiltro, EstatusFiltro> = {
+  todos: 'sin_receta',
+  sin_receta: 'revisar',
+  revisar: 'todos',
+}
+
+const etiquetaFiltro: Record<EstatusFiltro, string> = {
+  todos: 'Todos',
+  sin_receta: 'Sin receta',
+  revisar: 'Revisar costos',
+}
+
 export default function ProductosPage() {
   const [productos, setProductos] = useState<ProductoDTO[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -60,6 +78,7 @@ export default function ProductosPage() {
 
   const [busqueda, setBusqueda] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todos')
+  const [estatusFiltro, setEstatusFiltro] = useState<EstatusFiltro>('todos')
 
   const [togglingDisp, setTogglingDisp] = useState<number | null>(null)
 
@@ -316,6 +335,7 @@ export default function ProductosPage() {
   const productosFiltrados = productos
     .filter((p) => categoriaFiltro === 'Todos' || p.categoria === categoriaFiltro)
     .filter((p) => !busqueda.trim() || p.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
+    .filter((p) => estatusFiltro === 'todos' || estatusDe(p) === estatusFiltro)
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
@@ -410,14 +430,37 @@ export default function ProductosPage() {
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide">Categoría</th>
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Precio</th>
               <th className="px-5 py-3 text-xs font-medium text-stone-400 uppercase tracking-wide text-right">Costo</th>
+              <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide">
+                <button
+                  onClick={() => setEstatusFiltro(siguienteFiltro[estatusFiltro])}
+                  title="Clic para filtrar: Todos → Sin receta → Revisar costos"
+                  className={`flex items-center gap-1 uppercase tracking-wide transition-colors ${
+                    estatusFiltro === 'todos' ? 'text-stone-400 hover:text-forest' : 'text-forest'
+                  }`}
+                >
+                  Estatus
+                  {estatusFiltro !== 'todos' && (
+                    <span className="normal-case tracking-normal bg-forest text-cream px-1.5 py-0.5 rounded text-[10px]">
+                      {etiquetaFiltro[estatusFiltro]}
+                    </span>
+                  )}
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+                  </svg>
+                </button>
+              </th>
               <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-50">
             {productosFiltrados.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-stone-400">
-                  {busqueda ? `Sin resultados para "${busqueda}"` : 'Sin productos en esta categoría'}
+                <td colSpan={6} className="px-5 py-12 text-center text-stone-400">
+                  {busqueda
+                    ? `Sin resultados para "${busqueda}"`
+                    : estatusFiltro !== 'todos'
+                      ? `Sin productos con estatus "${etiquetaFiltro[estatusFiltro]}"`
+                      : 'Sin productos en esta categoría'}
                 </td>
               </tr>
             )}
@@ -432,8 +475,7 @@ export default function ProductosPage() {
                 <td className="px-5 py-3 text-stone-500">{p.categoria || '—'}</td>
                 <td className="px-5 py-3 text-right font-semibold text-forest">{fmt(p.precioVenta)}</td>
                 <td className="px-5 py-3 text-right text-stone-500 text-xs">{p.costo > 0 ? fmt(p.costo) : '—'}</td>
-                <td className="px-5 py-3 text-right">
-                  <div className="flex items-center justify-end gap-3">
+                <td className="px-5 py-3 whitespace-nowrap">
                     {!p.tieneReceta && (
                       <span className="text-xs text-amber-500 flex items-center gap-1" title="Este producto no tiene receta asignada">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
@@ -451,6 +493,12 @@ export default function ProductosPage() {
                         Revisar costos
                       </span>
                     )}
+                    {estatusDe(p) === 'ok' && (
+                      <span className="text-xs text-emerald-600">Al día</span>
+                    )}
+                </td>
+                <td className="px-5 py-3 text-right">
+                  <div className="flex items-center justify-end gap-3">
                     <button
                       onClick={() => handleToggleDisponibilidad(p)}
                       disabled={togglingDisp === p.id}
